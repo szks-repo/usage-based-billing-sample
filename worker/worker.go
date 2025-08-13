@@ -2,6 +2,8 @@ package worker
 
 import (
 	"context"
+	"log/slog"
+	"time"
 )
 
 type Worker struct {
@@ -15,14 +17,10 @@ func NewWorker(mqUrl string) *Worker {
 }
 
 func (w *Worker) Run(ctx context.Context) {
+	slog.Info("Worker started")
+
 	// Start worker logic here
-	go func() {
-		for {
-			select {
-			case <-ctx.Done():
-				return
-			default:
-			}
-		}
-	}()
+	for {
+		time.Sleep(3 * time.Second) // Simulate work
+	}
 }
