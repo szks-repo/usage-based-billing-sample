@@ -1,13 +1,12 @@
 /*
 Copyright © 2025 NAME HERE <EMAIL ADDRESS>
-
 */
 package cmd
 
 import (
-	"fmt"
-
 	"github.com/spf13/cobra"
+
+	"github.com/szks-repo/usage-based-billing-sample/provider"
 )
 
 // providerApiCmd represents the providerApi command
@@ -21,7 +20,11 @@ Cobra is a CLI library for Go that empowers applications.
 This application is a tool to generate the needed files
 to quickly create a Cobra application.`,
 	Run: func(cmd *cobra.Command, args []string) {
-		fmt.Println("providerApi called")
+		srv := provider.NewApiServer(
+			"todo",
+			":8080",
+		)
+		srv.ListenAndServe()
 	},
 }
 

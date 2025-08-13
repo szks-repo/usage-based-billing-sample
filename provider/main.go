@@ -2,7 +2,10 @@ package provider
 
 import "net/http"
 
-func NewApiServer(mqUrl string) *http.Server {
+func NewApiServer(
+	mqUrl string,
+	port string,
+) *http.Server {
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /api/v1/hello", func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
@@ -10,7 +13,7 @@ func NewApiServer(mqUrl string) *http.Server {
 	})
 
 	server := &http.Server{
-		Addr:    ":8080",
+		Addr:    port,
 		Handler: mux,
 	}
 	return server
