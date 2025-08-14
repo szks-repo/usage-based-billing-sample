@@ -1,0 +1,10 @@
+[env]
+GOEXPERIMENT = 'jsonv2'
+
+[tasks.runWorker]
+run = 'go run main.go receiverWorker'
+description = 'Build the app'
+
+[tasks.runProvider]
+run = 'go run main.go providerApi'
+description = 'Build the app'
