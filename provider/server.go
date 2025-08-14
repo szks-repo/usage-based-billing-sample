@@ -11,8 +11,7 @@ func NewApiServer(
 	port string,
 ) *http.Server {
 
-	handler := NewApiHandler(mqConn) // Assuming mqConn is not used in this example
-
+	handler := NewApiHandler(mqConn)
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /api/v1/health", handler.HandleHelth)
 	mux.HandleFunc("GET /api/v1/one", handler.HandleApi1)
