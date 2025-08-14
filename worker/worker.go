@@ -65,4 +65,6 @@ func (w *Worker) Run(ctx context.Context) {
 		fmt.Println("Received message:", dst)
 		msg.Ack(false) // ack the message
 	}
+
+	// TODO: write request log parquet file to S3
 }
