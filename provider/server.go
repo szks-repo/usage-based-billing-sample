@@ -1,6 +1,7 @@
 package provider
 
 import (
+	"log/slog"
 	"net/http"
 
 	"github.com/szks-repo/usage-based-billing-sample/pkg/rabbitmq"
@@ -10,8 +11,20 @@ func NewApiServer(
 	mqConn *rabbitmq.Conn,
 	port string,
 ) *http.Server {
+	queue, err := mqConn.Channel.QueueDeclare(
+		"api1_queue",
+		true,
+		false,
+		false,
+		false,
+		nil,
+	)
+	if err != nil {
+		slog.Error("Failed to declare queue", "error", err)
+		panic(err)
+	}
 
-	handler := NewApiHandler(mqConn)
+	handler := NewApiHandler(mqConn, queue)
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /api/v1/health", handler.HandleHelth)
 	mux.HandleFunc("GET /api/v1/one", handler.HandleApi1)
