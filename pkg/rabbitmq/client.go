@@ -2,11 +2,11 @@ package rabbitmq
 
 import (
 	"github.com/streadway/amqp"
-)"
+)
 
 type Conn struct {
-	conn *amqp.Connection
-	channel *amqp.Channel
+	Conn    *amqp.Connection
+	Channel *amqp.Channel
 }
 
 func NewConn(queueUrl string) (*Conn, error) {
@@ -23,16 +23,16 @@ func NewConn(queueUrl string) (*Conn, error) {
 	channel.Qos(1, 0, false) // Set QoS to ensure fair dispatch
 
 	return &Conn{
-		conn:    conn,
-		channel: channel,
+		Conn:    conn,
+		Channel: channel,
 	}, nil
 }
 
 func (c *Conn) Close() {
-	if c.channel != nil {
-		c.channel.Close()
+	if c.Channel != nil {
+		c.Channel.Close()
 	}
-	if c.conn != nil {
-		c.conn.Close()
+	if c.Conn != nil {
+		c.Conn.Close()
 	}
 }
