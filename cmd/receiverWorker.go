@@ -1,7 +1,12 @@
 package cmd
 
 import (
+	"context"
 	"log/slog"
+	"os"
+	"os/signal"
+	"syscall"
+	"time"
 
 	"github.com/spf13/cobra"
 	"github.com/szks-repo/usage-based-billing-sample/pkg/rabbitmq"
@@ -21,6 +26,10 @@ to quickly create a Cobra application.`,
 	Run: func(cmd *cobra.Command, args []string) {
 		slog.Info("Starting receiver worker")
 
+		ctx := cmd.Context()
+		nctx, stop := signal.NotifyContext(ctx, os.Interrupt, syscall.SIGTERM)
+		defer stop()
+
 		mqConn, err := rabbitmq.NewConn("amqp://localhost:5672")
 		if err != nil {
 			slog.Error("Failed to connect to RabbitMQ", "error", err)
@@ -29,7 +38,14 @@ to quickly create a Cobra application.`,
 		defer mqConn.Close()
 
 		worker := worker.NewWorker(mqConn)
-		worker.Run(cmd.Context())
+		go worker.Run(ctx)
+
+		<-nctx.Done()
+		slog.Info("Received shutdown signal, stopping worker")
+
+		ctx, cancel := context.WithTimeout(ctx, 20*time.Second)
+		defer cancel()
+		slog.Info("Worker stopped gracefully")
 	},
 }
 
