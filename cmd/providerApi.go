@@ -1,7 +1,12 @@
 package cmd
 
 import (
+	"context"
 	"log/slog"
+	"os"
+	"os/signal"
+	"syscall"
+	"time"
 
 	"github.com/spf13/cobra"
 
@@ -22,6 +27,10 @@ to quickly create a Cobra application.`,
 	Run: func(cmd *cobra.Command, args []string) {
 		slog.Info("Starting provider API server")
 
+		ctx := cmd.Context()
+		nctx, stop := signal.NotifyContext(ctx, os.Interrupt, syscall.SIGTERM)
+		defer stop()
+
 		mqConn, err := rabbitmq.NewConn("amqp://localhost:5672")
 		defer mqConn.Close()
 		if err != nil {
@@ -30,9 +39,19 @@ to quickly create a Cobra application.`,
 		}
 
 		srv := provider.NewApiServer(mqConn, ":8080")
-		if err := srv.ListenAndServe(); err != nil {
-			slog.Error("Failed to start provider API server", "error", err)
-		}
+		go func() {
+			if err := srv.ListenAndServe(); err != nil {
+				slog.Error("provider API server", "error", err)
+			}
+		}()
+
+		<-nctx.Done()
+		slog.Info("Received shutdown signal, stopping worker")
+
+		ctx, cancel := context.WithTimeout(ctx, 20*time.Second)
+		defer cancel()
+		srv.Shutdown(ctx)
+		slog.Info("Worker stopped gracefully")
 	},
 }
 
