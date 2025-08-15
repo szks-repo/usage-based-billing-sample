@@ -1,14 +1,15 @@
 package provider
 
 import (
-	"crypto/rand"
-	"fmt"
+	"encoding/json"
 	"log/slog"
 	"net/http"
 	"time"
 
 	"github.com/streadway/amqp"
+
 	"github.com/szks-repo/usage-based-billing-sample/pkg/rabbitmq"
+	"github.com/szks-repo/usage-based-billing-sample/pkg/types"
 )
 
 type ApiHandler struct {
@@ -46,15 +47,30 @@ func (h *ApiHandler) HandleApi1(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// todo move to interfaces
+	// todo move to after middleware
+	payload, err := json.Marshal(&types.AccessLog{
+		Timestamp:  time.Now(),
+		ClientIP:   r.RemoteAddr,
+		Path:       r.URL.Path,
+		Method:     r.Method,
+		Protocol:   r.URL.Scheme,
+		StatusCode: 200, //todo
+		Latency:    int64(time.Millisecond * 10),
+		UserAgent:  r.UserAgent(),
+	})
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
 	if err := h.mqConn.Channel.Publish(
-		"",           // exchange 
+		"",           // exchange
 		h.queue.Name, // routing key
 		false,        // mandatory
 		false,        // immediate
 		amqp.Publishing{
 			ContentType:  "application/json",
-			Body:         []byte(fmt.Sprintf(`{"message": "Hello from API 1","messageId":"%s"}`, rand.Text())),
+			Body:         payload,
 			DeliveryMode: amqp.Persistent,
 			Headers: map[string]any{
 				"x-api-key": apiKey,

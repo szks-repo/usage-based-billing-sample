@@ -2,20 +2,34 @@ package worker
 
 import (
 	"context"
-	"encoding/json/v2"
-	"fmt"
+	"encoding/json"
 	"log/slog"
+	"time"
 
+	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/szks-repo/usage-based-billing-sample/pkg/rabbitmq"
+	"github.com/szks-repo/usage-based-billing-sample/pkg/types"
 )
 
 type Worker struct {
-	mqConn *rabbitmq.Conn
+	mqConn   *rabbitmq.Conn
+	s3Writer *S3Writer
 }
 
-func NewWorker(mqConn *rabbitmq.Conn) *Worker {
+func NewWorker(
+	mqConn *rabbitmq.Conn,
+	s3Client *s3.Client,
+) *Worker {
+	s3Writer := NewS3Writer(
+		s3Client,
+		"api-access-log",
+		1024<<10*5,
+		time.Second*5,
+	)
+
 	return &Worker{
-		mqConn: mqConn,
+		mqConn:   mqConn,
+		s3Writer: s3Writer,
 	}
 }
 
@@ -51,19 +65,22 @@ func (w *Worker) Run(ctx context.Context) {
 		return
 	}
 
+	w.s3Writer.Start(ctx)
+	defer w.s3Writer.Stop()
+
 	slog.Info("Worker is ready to consume messages", "queue", queue.Name)
 	for msg := range msgs {
 		slog.Info("Received message", "body", string(msg.Body))
 
-		dst := make(map[string]any)
-		if err := json.Unmarshal(msg.Body, &dst); err != nil {
+		var accessLog types.AccessLog
+		if err := json.Unmarshal(msg.Body, &accessLog); err != nil {
 			slog.Error("Failed to unmarshal message", "error", err)
 			msg.Nack(false, false) // nack the message
 			continue
 		}
 
-		fmt.Println("Received message:", dst)
-		msg.Ack(false) // ack the message
+		go w.s3Writer.AddLog(accessLog)
+		msg.Ack(false)
 	}
 
 	// TODO: write request log parquet file to S3
