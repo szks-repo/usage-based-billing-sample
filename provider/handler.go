@@ -41,6 +41,7 @@ func (h *ApiHandler) HandleHelth(w http.ResponseWriter, r *http.Request) {
 func (h *ApiHandler) HandleApi1(w http.ResponseWriter, r *http.Request) {
 	slog.Info("Handling API 1 request", "queueName", h.queue.Name)
 
+	// todo move to api before middleware
 	apiKey := r.Header.Get("x-api-key")
 	if err := h.apiKeyChecker.Check(r.Context(), apiKey); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
