@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"log"
 	"log/slog"
 	"sync"
 	"time"
@@ -100,12 +99,12 @@ func (u *S3Writer) flush(ctx context.Context) {
 	copy(logsToUpload, u.buffer)
 	u.buffer = u.buffer[:0] // バッファをクリア
 
-	log.Printf("Flushing %d logs to S3...\n", len(logsToUpload))
+	slog.Info("Flushing logs to S3...", "numLogs", len(logsToUpload))
 
 	// Parquetに変換
 	parquetData, err := convertToParquet(logsToUpload)
 	if err != nil {
-		log.Printf("Error converting to parquet: %v\n", err)
+		slog.Error("Error converting to parquet", "error", err)
 		// 本番ではリトライ処理などを検討
 		return
 	}
@@ -119,7 +118,7 @@ func (u *S3Writer) flush(ctx context.Context) {
 		Key:    &key,
 		Body:   bytes.NewReader(parquetData),
 	}); err != nil {
-		slog.Error("Error uploading to S3", "err", err)
+		slog.Error("Error uploading to S3", "error", err)
 		return
 	}
 
