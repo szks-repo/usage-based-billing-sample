@@ -58,12 +58,12 @@ func (u *S3Writer) AddLog(log types.AccessLog) {
 }
 
 func (u *S3Writer) Start(ctx context.Context) {
-	u.wg.Add(1)
 	go func() {
-		defer u.wg.Done()
-
 		for {
 			select {
+			case <-ctx.Done():
+				slog.Info("ctx.Done", "error", ctx.Err())
+				return
 			case l := <-u.logChan:
 				u.mutex.Lock()
 				u.buffer = append(u.buffer, l)
