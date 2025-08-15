@@ -5,9 +5,12 @@ import (
 	"log/slog"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
 
+	"github.com/aws/aws-sdk-go-v2/config"
+	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/spf13/cobra"
 	"github.com/szks-repo/usage-based-billing-sample/pkg/rabbitmq"
 	"github.com/szks-repo/usage-based-billing-sample/worker"
@@ -26,18 +29,38 @@ to quickly create a Cobra application.`,
 	Run: func(cmd *cobra.Command, args []string) {
 		slog.Info("Starting receiver worker")
 
+		var (
+			awsRegion = "ap-northeast-1"
+			s3Url     = "http://localhost:9000"
+			queueUrl  = "amqp://localhost:5672"
+		)
+
 		ctx := cmd.Context()
 		nctx, stop := signal.NotifyContext(ctx, os.Interrupt, syscall.SIGTERM)
 		defer stop()
 
-		mqConn, err := rabbitmq.NewConn("amqp://localhost:5672")
+		mqConn, err := rabbitmq.NewConn(queueUrl)
 		if err != nil {
 			slog.Error("Failed to connect to RabbitMQ", "error", err)
 			return
 		}
 		defer mqConn.Close()
 
-		worker := worker.NewWorker(mqConn)
+		cfg, err := config.LoadDefaultConfig(ctx, config.WithRegion(awsRegion))
+		if err != nil {
+			panic(err)
+		}
+		s3Client := s3.NewFromConfig(cfg, func(o *s3.Options) {
+			o.BaseEndpoint = &s3Url
+			if strings.Contains(s3Url, "localhost") {
+				o.UsePathStyle = true
+			}
+		})
+
+		worker := worker.NewWorker(
+			mqConn,
+			s3Client,
+		)
 		go worker.Run(ctx)
 
 		<-nctx.Done()
