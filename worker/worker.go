@@ -79,7 +79,7 @@ func (w *Worker) Run(ctx context.Context) {
 			continue
 		}
 
-		go w.s3Writer.AddLog(accessLog)
+		w.s3Writer.AddLog(accessLog)
 		msg.Ack(false)
 	}
 
