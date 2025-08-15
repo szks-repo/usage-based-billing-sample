@@ -9,6 +9,7 @@ import (
 
 func NewApiServer(
 	mqConn *rabbitmq.Conn,
+	apiKeyChecker ApiKeyChecker,
 	port string,
 ) *http.Server {
 	queue, err := mqConn.Channel.QueueDeclare(
@@ -24,7 +25,11 @@ func NewApiServer(
 		panic(err)
 	}
 
-	handler := NewApiHandler(mqConn, queue)
+	handler := NewApiHandler(
+		mqConn,
+		queue,
+		apiKeyChecker,
+	)
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /api/v1/health", handler.HandleHelth)
 	mux.HandleFunc("GET /api/v1/one", handler.HandleApi1)
