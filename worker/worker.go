@@ -24,7 +24,7 @@ func NewWorker(
 		s3Client,
 		"api-access-log",
 		1024<<10*5,
-		time.Second*5,
+		time.Second*30,
 	)
 
 	return &Worker{
