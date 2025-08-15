@@ -75,13 +75,11 @@ func (w *Worker) Run(ctx context.Context) {
 		var accessLog types.AccessLog
 		if err := json.Unmarshal(msg.Body, &accessLog); err != nil {
 			slog.Error("Failed to unmarshal message", "error", err)
-			msg.Nack(false, false) // nack the message
+			msg.Nack(false, false)
 			continue
 		}
 
 		w.s3Writer.AddLog(accessLog)
 		msg.Ack(false)
 	}
-
-	// TODO: write request log parquet file to S3
 }
