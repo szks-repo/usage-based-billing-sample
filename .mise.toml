@@ -1,10 +1,15 @@
 [env]
 GOEXPERIMENT = 'jsonv2'
 
-[tasks.runWorker]
+[tasks.container-start]
+run = [
+    "docker compose up -d"
+]
+
+[tasks.run-worker]
 run = 'go run main.go receiverWorker'
 description = 'Build the app'
 
-[tasks.runProvider]
+[tasks.run-provider]
 run = 'go run main.go providerApi'
 description = 'Build the app'
