@@ -38,7 +38,8 @@ to quickly create a Cobra application.`,
 			return
 		}
 
-		srv := provider.NewApiServer(mqConn, ":8080")
+		// todo: install github.com/mazrean/kessoku
+		srv := provider.NewApiServer(mqConn, provider.NewApiKeyChecker(), ":8080")
 		go func() {
 			if err := srv.ListenAndServe(); err != nil {
 				slog.Error("provider API server", "error", err)
