@@ -28,7 +28,7 @@ func Test_apiKeyChecker_shouldCache(t *testing.T) {
 			},
 			want: true,
 		},
-			{
+		{
 			args: args{
 				now:          time.Date(2025, 1, 1, 0, 0, 0, 0, time.UTC),
 				expiredAt:    time.Date(2025, 1, 1, 0, 20, 0, 1, time.UTC),
