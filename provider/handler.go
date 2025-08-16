@@ -54,7 +54,6 @@ func (h *ApiHandler) HandleApi1(w http.ResponseWriter, r *http.Request) {
 		ClientIP:   r.RemoteAddr,
 		Path:       r.URL.Path,
 		Method:     r.Method,
-		Protocol:   r.URL.Scheme,
 		StatusCode: 200, //todo
 		Latency:    int64(time.Millisecond * 10),
 		UserAgent:  r.UserAgent(),
