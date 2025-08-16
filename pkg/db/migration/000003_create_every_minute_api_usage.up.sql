@@ -4,8 +4,5 @@ CREATE TABLE IF NOT EXISTS `every_minute_api_usage` (
     `usage` bigint UNSIGNED NOT NULL DEFAULT 0,
     `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP(),
     `updated_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP() ON UPDATE CURRENT_TIMESTAMP(),
-    PRIMARY KEY (`account_id`, `munite_key`),
-    CONSTRAINT `fk_account_id`
-        FOREIGN KEY (`account_id`)
-        REFERENCES `accounts` (`id`)
+    PRIMARY KEY (`account_id`, `minute`)
 ) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
