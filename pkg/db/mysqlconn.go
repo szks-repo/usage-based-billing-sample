@@ -33,7 +33,7 @@ func Close() {
 }
 
 func open() (*sql.DB, error) {
-	db, err := sql.Open("mysql", fmt.Sprintf("%s:@tcp(localhost:3306)/usage_based_billing?charset=utf8mb4&parseTime=true", "user"))
+	db, err := sql.Open("mysql", fmt.Sprintf("%s:%s@tcp(localhost:3306)/usage_based_billing?charset=utf8mb4&parseTime=true", "user", "password"))
 	if err != nil {
 		return nil, err
 	}

@@ -42,18 +42,20 @@ func (mw *middleware) Wrap(next http.Handler) http.Handler {
 
 		apiKey := r.Header.Get("x-api-key")
 
-		if err := mw.apiKeyChecker.Check(r.Context(), apiKey); err != nil {
+		accountId, err := mw.apiKeyChecker.Check(r.Context(), apiKey)
+		if err != nil {
 			slog.Info("Invalid api key", "apiKey", apiKey, "error", err)
 			http.Error(w, "Unauthorized: missing or invalid api key", http.StatusUnauthorized)
 			return
 		}
 
+		ctx := context.WithValue(r.Context(), ctxkey.ApiKey{}, apiKey)
+		ctx = context.WithValue(ctx, ctxkey.AccountId{}, accountId)
+
 		w2 := &ResponseWriterWrapper{
 			ResponseWriter: w,
 			statusCode:     http.StatusOK,
 		}
-
-		ctx := context.WithValue(r.Context(), ctxkey.ApiKey{}, apiKey)
 
 		next.ServeHTTP(w2, r.WithContext(ctx))
 		slog.Info("End main handler", "path", r.URL.Path, "satusCode", w2.statusCode)
