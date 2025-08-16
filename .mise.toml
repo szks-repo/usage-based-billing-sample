@@ -11,6 +11,12 @@ run = [
     "docker compose up -d"
 ]
 
+[tasks.migrate-up]
+run = 'migrate --path pkg/db/migration --database mysql://user:password@tcp(localhost:3306)/usage_based_billing -verbose up'
+
+[tasks.migrate-down]
+run = 'migrate --path pkg/db/migration --database mysql://user:password@tcp(localhost:3306)/usage_based_billing -verbose down'
+
 [tasks.run-worker]
 run = 'go run main.go receiverWorker'
 description = 'Build the app'
