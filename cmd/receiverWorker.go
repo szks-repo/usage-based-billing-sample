@@ -12,6 +12,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/spf13/cobra"
+	"github.com/szks-repo/usage-based-billing-sample/pkg/db"
 	"github.com/szks-repo/usage-based-billing-sample/pkg/rabbitmq"
 	"github.com/szks-repo/usage-based-billing-sample/worker"
 )
@@ -32,12 +33,16 @@ to quickly create a Cobra application.`,
 		var (
 			awsRegion = "ap-northeast-1"
 			s3Url     = "http://localhost:9000"
+			s3Bucket  = "api-access-log"
 			queueUrl  = "amqp://localhost:5672"
 		)
 
 		ctx := cmd.Context()
 		nctx, stop := signal.NotifyContext(ctx, os.Interrupt, syscall.SIGTERM)
 		defer stop()
+
+		db.MustInit()
+		defer db.Close()
 
 		mqConn, err := rabbitmq.NewConn(queueUrl)
 		if err != nil {
@@ -59,7 +64,13 @@ to quickly create a Cobra application.`,
 
 		worker := worker.NewWorker(
 			mqConn,
-			s3Client,
+			worker.NewAccessLogRecorder(
+				s3Client,
+				s3Bucket,
+				1024<<10*5,
+				time.Second*30,
+				db.Get(),
+			),
 		)
 		go worker.Run(ctx)
 

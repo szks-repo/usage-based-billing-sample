@@ -3,6 +3,7 @@ package worker
 import (
 	"bytes"
 	"context"
+	"database/sql"
 	"fmt"
 	"log/slog"
 	"sync"
@@ -17,13 +18,15 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/google/uuid"
 
+	"github.com/szks-repo/usage-based-billing-sample/pkg/db/dto"
 	"github.com/szks-repo/usage-based-billing-sample/pkg/types"
 )
 
-// S3Uploader はログをS3にアップロードする責務を持つ
-type S3Writer struct {
+type AccessLogRecorder struct {
 	s3Client   *s3.Client
 	bucketName string
+
+	dbConn *sql.DB
 
 	logChan    chan types.ApiAccessLog
 	buffer     []types.ApiAccessLog
@@ -35,15 +38,17 @@ type S3Writer struct {
 }
 
 // NewS3Uploader は新しいUploaderインスタンスを作成
-func NewS3Writer(
+func NewAccessLogRecorder(
 	client *s3.Client,
 	bucket string,
 	bufferSize int,
 	interval time.Duration,
-) *S3Writer {
-	return &S3Writer{
+	dbConn *sql.DB,
+) *AccessLogRecorder {
+	return &AccessLogRecorder{
 		s3Client:   client,
 		bucketName: bucket,
+		dbConn:     dbConn,
 		logChan:    make(chan types.ApiAccessLog, bufferSize*2),
 		buffer:     make([]types.ApiAccessLog, 0, bufferSize),
 		bufferSize: bufferSize,
@@ -52,58 +57,47 @@ func NewS3Writer(
 	}
 }
 
-func (u *S3Writer) AddLog(log types.ApiAccessLog) {
+func (u *AccessLogRecorder) Push(log types.ApiAccessLog) {
 	u.logChan <- log
 }
 
-func (u *S3Writer) Start(ctx context.Context) {
+func (r *AccessLogRecorder) Observe(ctx context.Context) {
 	go func() {
 		for {
 			select {
 			case <-ctx.Done():
-				u.flush(context.WithoutCancel(ctx))
+				r.flush(context.WithoutCancel(ctx))
 				slog.Info("ctx.Done", "error", ctx.Err())
 				return
-			case <-u.shutdown:
-				u.flush(context.WithoutCancel(ctx))
+			case <-r.shutdown:
+				r.flush(context.WithoutCancel(ctx))
 				slog.Info("S3 uploader shutting down.")
 				return
-			case l := <-u.logChan:
-				u.mutex.Lock()
-				u.buffer = append(u.buffer, l)
-				u.mutex.Unlock()
+			case l := <-r.logChan:
+				r.mutex.Lock()
+				r.buffer = append(r.buffer, l)
+				r.mutex.Unlock()
 
-				if len(u.buffer) >= u.bufferSize {
-					u.flush(ctx)
+				if len(r.buffer) >= r.bufferSize {
+					r.flush(ctx)
 				}
-			case <-u.ticker.C:
-				u.flush(ctx)
+			case <-r.ticker.C:
+				r.flush(ctx)
 			}
 		}
 	}()
 }
 
-func (u *S3Writer) Stop() {
-	close(u.shutdown)
-	u.wg.Wait()
+func (r *AccessLogRecorder) Stop() {
+	close(r.shutdown)
+	r.wg.Wait()
 }
 
-func (u *S3Writer) flush(ctx context.Context) {
-	u.mutex.Lock()
-	defer u.mutex.Unlock()
-
-	if len(u.buffer) == 0 {
-		return
-	}
-
-	logsToUpload := make([]types.ApiAccessLog, len(u.buffer))
-	copy(logsToUpload, u.buffer)
-	u.buffer = u.buffer[:0] // バッファをクリア
-
-	slog.Info("Flushing logs to S3...", "numLogs", len(logsToUpload))
+func (r *AccessLogRecorder) uploadToS3(ctx context.Context, logs []types.ApiAccessLog) {
+	slog.Info("Flushing logs to S3...", "numLogs", len(logs))
 
 	// Parquetに変換
-	parquetData, err := convertToParquet(logsToUpload)
+	parquetData, err := r.convertToParquet(logs)
 	if err != nil {
 		slog.Error("Error converting to parquet", "error", err)
 		// 本番ではリトライ処理などを検討
@@ -114,8 +108,8 @@ func (u *S3Writer) flush(ctx context.Context) {
 	// logs/YYYY/MM/DD/uuid.parquet のようなキーにする
 	key := fmt.Sprintf("logs/%s/%s.parquet", time.Now().Format("2006/01/02"), uuid.Must(uuid.NewV7()).String())
 
-	if _, err = u.s3Client.PutObject(ctx, &s3.PutObjectInput{
-		Bucket: &u.bucketName,
+	if _, err = r.s3Client.PutObject(ctx, &s3.PutObjectInput{
+		Bucket: &r.bucketName,
 		Key:    &key,
 		Body:   bytes.NewReader(parquetData),
 	}); err != nil {
@@ -124,6 +118,27 @@ func (u *S3Writer) flush(ctx context.Context) {
 	}
 
 	slog.Info("Successfully uploaded", "key", key)
+}
+
+func (r *AccessLogRecorder) flush(ctx context.Context) {
+	r.mutex.Lock()
+	defer r.mutex.Unlock()
+
+	if len(r.buffer) == 0 {
+		return
+	}
+
+	logsToUpload := make([]types.ApiAccessLog, len(r.buffer))
+	copy(logsToUpload, r.buffer)
+	r.buffer = r.buffer[:0]
+
+	var wg sync.WaitGroup
+	wg.Go(func() {
+		r.uploadToS3(ctx, logsToUpload)
+	})
+	wg.Go(func() {
+		r.saveAggregated(ctx, logsToUpload)
+	})
 }
 
 var parquetSchema = arrow.NewSchema(
@@ -140,7 +155,7 @@ var parquetSchema = arrow.NewSchema(
 	nil, // metadata
 )
 
-func convertToParquet(logs []types.ApiAccessLog) ([]byte, error) {
+func (a *AccessLogRecorder) convertToParquet(logs []types.ApiAccessLog) ([]byte, error) {
 	pool := memory.NewGoAllocator()
 	rb := array.NewRecordBuilder(pool, parquetSchema)
 	defer rb.Release()
@@ -176,4 +191,57 @@ func convertToParquet(logs []types.ApiAccessLog) ([]byte, error) {
 	}
 
 	return buf.Bytes(), nil
+}
+
+func (r *AccessLogRecorder) saveAggregated(ctx context.Context, accessLogs []types.ApiAccessLog) error {
+	if len(accessLogs) == 0 {
+		return nil
+	}
+
+	groupByAccounts := make(map[int64][]types.ApiAccessLog)
+	for _, l := range accessLogs {
+		groupByAccounts[l.AccountId] = append(groupByAccounts[l.AccountId], l)
+	}
+
+	var dst []*dto.EveryMinuteAPIUsage
+	for accountId, logs := range groupByAccounts {
+		minuteGroup := make(map[string]int)
+		for _, l := range logs {
+			minuteGroup[l.Timestamp.Format("200601021504")] += 1
+		}
+		for minute, usage := range minuteGroup {
+			dst = append(dst, &dto.EveryMinuteAPIUsage{
+				AccountID: uint64(accountId),
+				Minute:    minute,
+				Usage:     uint64(usage),
+			})
+		}
+	}
+
+	if len(dst) == 0 {
+		return nil
+	}
+
+	slog.Info("Upsert minute aggregate records", "num", len(dst))
+	// consider: xo/dbtplにbulk insertない
+	stmt, err := r.dbConn.PrepareContext(
+		ctx, "INSERT INTO every_minute_api_usage (`account_id`, `minute`, `usage`) VALUES (?, ?, ?) "+
+			"ON DUPLICATE KEY UPDATE "+
+			"`usage` = `usage` + VALUES(`usage`), `updated_at` = NOW()",
+	)
+	if err != nil {
+		slog.Error("Failed to PrepareContext", "error", err)
+		return err
+	}
+	defer stmt.Close()
+
+	for _, v := range dst {
+		slog.Info("Upsert usage", "accountId", v.AccountID, "minute", v.Minute)
+		if _, err := stmt.ExecContext(ctx, v.AccountID, v.Minute, v.Usage); err != nil {
+			slog.Error("Failed to ExecContext", "error", err)
+			return err
+		}
+	}
+
+	return nil
 }
