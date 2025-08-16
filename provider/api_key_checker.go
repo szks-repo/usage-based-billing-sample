@@ -60,5 +60,5 @@ func (c *apiKeyChecker) Check(ctx context.Context, apiKey string) (int64, error)
 }
 
 func (c *apiKeyChecker) shouldCache(now, expriedAt time.Time, cacheExpires time.Duration) bool {
-	return now.Add(cacheExpires).Before(expriedAt)
+	return now.Add(cacheExpires - 1).Before(expriedAt)
 }

@@ -11,6 +11,7 @@ require (
 	github.com/hashicorp/golang-lru/v2 v2.0.7
 	github.com/spf13/cobra v1.9.1
 	github.com/streadway/amqp v1.1.0
+	github.com/zeebo/assert v1.3.0
 )
 
 require (
