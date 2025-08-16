@@ -4,32 +4,23 @@ import (
 	"context"
 	"encoding/json"
 	"log/slog"
-	"time"
 
-	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/szks-repo/usage-based-billing-sample/pkg/rabbitmq"
 	"github.com/szks-repo/usage-based-billing-sample/pkg/types"
 )
 
 type Worker struct {
 	mqConn   *rabbitmq.Conn
-	s3Writer *S3Writer
+	recorder *AccessLogRecorder
 }
 
 func NewWorker(
 	mqConn *rabbitmq.Conn,
-	s3Client *s3.Client,
+	recorder *AccessLogRecorder,
 ) *Worker {
-	s3Writer := NewS3Writer(
-		s3Client,
-		"api-access-log",
-		1024<<10*5,
-		time.Second*30,
-	)
-
 	return &Worker{
 		mqConn:   mqConn,
-		s3Writer: s3Writer,
+		recorder: recorder,
 	}
 }
 
@@ -65,8 +56,8 @@ func (w *Worker) Run(ctx context.Context) {
 		return
 	}
 
-	w.s3Writer.Start(ctx)
-	defer w.s3Writer.Stop()
+	w.recorder.Observe(ctx)
+	defer w.recorder.Stop()
 
 	slog.Info("Worker is ready to consume messages", "queue", queue.Name)
 	for msg := range msgs {
@@ -79,7 +70,7 @@ func (w *Worker) Run(ctx context.Context) {
 			continue
 		}
 
-		w.s3Writer.AddLog(accessLog)
+		w.recorder.Push(accessLog)
 		msg.Ack(false)
 	}
 }
