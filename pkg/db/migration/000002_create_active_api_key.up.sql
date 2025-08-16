@@ -7,3 +7,4 @@ CREATE TABLE IF NOT EXISTS `active_api_key` (
     PRIMARY KEY (`id`),
     UNIQUE INDEX (`api_key`)
 ) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+
