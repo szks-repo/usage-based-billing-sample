@@ -69,7 +69,7 @@ func (mw *middleware) Wrap(next http.Handler) http.Handler {
 			UserAgent:  r.UserAgent(),
 		})
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			slog.Error("failed to json.Marshal", "error", err)
 			return
 		}
 
