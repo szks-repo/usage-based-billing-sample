@@ -1,0 +1,112 @@
+package provider
+
+import (
+	"context"
+	"encoding/json"
+	"log/slog"
+	"net/http"
+	"time"
+
+	"github.com/streadway/amqp"
+	"github.com/szks-repo/usage-based-billing-sample/pkg/rabbitmq"
+	"github.com/szks-repo/usage-based-billing-sample/pkg/types"
+)
+
+type Middleware interface {
+	Wrap(next http.Handler) http.Handler
+}
+
+type middleware struct {
+	apiKeyChecker ApiKeyChecker
+	mqConn        *rabbitmq.Conn
+	queue         amqp.Queue
+}
+
+func NewMiddleware(
+	apiKeyChecker ApiKeyChecker,
+	mqConn *rabbitmq.Conn,
+	queue amqp.Queue,
+) Middleware {
+	return &middleware{
+		apiKeyChecker: apiKeyChecker,
+		mqConn:        mqConn,
+		queue:         queue,
+	}
+}
+
+func (mw *middleware) Wrap(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		start := time.Now()
+
+		apiKey := r.Header.Get("x-api-key")
+
+		if err := mw.apiKeyChecker.Check(r.Context(), apiKey); err != nil {
+			http.Error(w, "Unauthorized: missing or invalid api key", http.StatusUnauthorized)
+			return
+		}
+
+		w2 := &ResponseWriterWrapper{
+			ResponseWriter: w,
+			statusCode:     http.StatusOK,
+		}
+
+		ctx := context.WithValue(r.Context(), "apiKey", apiKey)
+		r = r.WithContext(ctx)
+
+		next.ServeHTTP(w2, r)
+		slog.Info("End main handler", "path", r.URL.Path, "satusCode", w2.statusCode)
+		if w2.statusCode < 200 || w2.statusCode >= 300 {
+			return
+		}
+
+		payload, err := json.Marshal(&types.ApiAccessLog{
+			Timestamp:  time.Now(),
+			ClientIP:   r.RemoteAddr,
+			Path:       r.URL.Path,
+			Method:     r.Method,
+			StatusCode: w2.statusCode,
+			Latency:    int64(time.Since(start)),
+			UserAgent:  r.UserAgent(),
+		})
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		if err := mw.mqConn.Channel.Publish(
+			"",            // exchange
+			mw.queue.Name, // routing key
+			false,         // mandatory
+			false,         // immediate
+			amqp.Publishing{
+				ContentType:  "application/json",
+				Body:         payload,
+				DeliveryMode: amqp.Persistent,
+				Headers: map[string]any{
+					"timestamp": time.Now().Format(time.RFC3339Nano),
+				},
+				Timestamp: time.Now(),
+			},
+		); err != nil {
+			slog.Error("Failed to publish message to RabbitMQ", "error", err)
+			return
+		}
+	})
+}
+
+type ResponseWriterWrapper struct {
+	http.ResponseWriter
+	statusCode   int
+	bytesWritten int
+}
+
+func (w *ResponseWriterWrapper) WriteHeader(statusCode int) {
+	w.statusCode = statusCode
+	w.ResponseWriter.WriteHeader(statusCode)
+}
+
+func (w *ResponseWriterWrapper) Write(data []byte) (int, error) {
+	n, err := w.ResponseWriter.Write(data)
+	w.bytesWritten += n
+	return n, err
+}
