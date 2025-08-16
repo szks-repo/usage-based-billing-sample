@@ -7,7 +7,6 @@ type AccessLog struct {
 	ClientIP   string    `json:"client_ip"`
 	Path       string    `json:"path"`
 	Method     string    `json:"method"`
-	Protocol   string    `json:"protocol"`
 	StatusCode int       `json:"status_code"`
 	Latency    int64     `json:"latency"`
 	UserAgent  string    `json:"user_agent"`

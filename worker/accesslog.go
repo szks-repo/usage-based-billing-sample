@@ -11,9 +11,9 @@ import (
 	"github.com/apache/arrow/go/v17/arrow"
 	"github.com/apache/arrow/go/v17/arrow/array"
 	"github.com/apache/arrow/go/v17/arrow/memory"
-	"github.com/apache/arrow/go/v17/parquet/pqarrow"
 	"github.com/apache/arrow/go/v17/parquet"
 	"github.com/apache/arrow/go/v17/parquet/compress"
+	"github.com/apache/arrow/go/v17/parquet/pqarrow"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/google/uuid"
 
@@ -130,7 +130,6 @@ var parquetSchema = arrow.NewSchema(
 		{Name: "client_ip", Type: arrow.BinaryTypes.String},
 		{Name: "method", Type: arrow.BinaryTypes.String},
 		{Name: "path", Type: arrow.BinaryTypes.String},
-		{Name: "protocol", Type: arrow.BinaryTypes.String},
 		{Name: "status_code", Type: arrow.PrimitiveTypes.Int32},
 		{Name: "latency_ms", Type: arrow.PrimitiveTypes.Int64},
 		{Name: "user_agent", Type: arrow.BinaryTypes.String},
@@ -148,11 +147,10 @@ func convertToParquet(logs []types.AccessLog) ([]byte, error) {
 		rb.Field(0).(*array.StringBuilder).Append(l.ClientIP)
 		rb.Field(1).(*array.StringBuilder).Append(l.Method)
 		rb.Field(2).(*array.StringBuilder).Append(l.Path)
-		rb.Field(3).(*array.StringBuilder).Append(l.Protocol)
-		rb.Field(4).(*array.Int32Builder).Append(int32(l.StatusCode))
-		rb.Field(5).(*array.Int64Builder).Append(l.Latency)
-		rb.Field(6).(*array.StringBuilder).Append(l.UserAgent)
-		rb.Field(7).(*array.TimestampBuilder).Append(arrow.Timestamp(l.Timestamp.UnixMilli()))
+		rb.Field(3).(*array.Int32Builder).Append(int32(l.StatusCode))
+		rb.Field(4).(*array.Int64Builder).Append(l.Latency)
+		rb.Field(5).(*array.StringBuilder).Append(l.UserAgent)
+		rb.Field(6).(*array.TimestampBuilder).Append(arrow.Timestamp(l.Timestamp.UnixMilli()))
 	}
 
 	rec := rb.NewRecord()
