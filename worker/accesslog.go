@@ -128,6 +128,7 @@ func (u *S3Writer) flush(ctx context.Context) {
 
 var parquetSchema = arrow.NewSchema(
 	[]arrow.Field{
+		{Name: "account_id", Type: arrow.PrimitiveTypes.Int64},
 		{Name: "client_ip", Type: arrow.BinaryTypes.String},
 		{Name: "method", Type: arrow.BinaryTypes.String},
 		{Name: "path", Type: arrow.BinaryTypes.String},
@@ -145,13 +146,14 @@ func convertToParquet(logs []types.ApiAccessLog) ([]byte, error) {
 	defer rb.Release()
 
 	for _, l := range logs {
-		rb.Field(0).(*array.StringBuilder).Append(l.ClientIP)
-		rb.Field(1).(*array.StringBuilder).Append(l.Method)
-		rb.Field(2).(*array.StringBuilder).Append(l.Path)
-		rb.Field(3).(*array.Int32Builder).Append(int32(l.StatusCode))
-		rb.Field(4).(*array.Int64Builder).Append(l.Latency)
-		rb.Field(5).(*array.StringBuilder).Append(l.UserAgent)
-		rb.Field(6).(*array.TimestampBuilder).Append(arrow.Timestamp(l.Timestamp.UnixMilli()))
+		rb.Field(0).(*array.Int64Builder).Append(l.AccountId)
+		rb.Field(1).(*array.StringBuilder).Append(l.ClientIP)
+		rb.Field(2).(*array.StringBuilder).Append(l.Method)
+		rb.Field(3).(*array.StringBuilder).Append(l.Path)
+		rb.Field(4).(*array.Int32Builder).Append(int32(l.StatusCode))
+		rb.Field(5).(*array.Int64Builder).Append(l.Latency)
+		rb.Field(6).(*array.StringBuilder).Append(l.UserAgent)
+		rb.Field(7).(*array.TimestampBuilder).Append(arrow.Timestamp(l.Timestamp.UnixMilli()))
 	}
 
 	rec := rb.NewRecord()

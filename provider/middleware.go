@@ -64,6 +64,7 @@ func (mw *middleware) Wrap(next http.Handler) http.Handler {
 		}
 
 		payload, err := json.Marshal(&types.ApiAccessLog{
+			AccountId:  accountId,
 			Timestamp:  time.Now(),
 			ClientIP:   r.RemoteAddr,
 			Path:       r.URL.Path,
