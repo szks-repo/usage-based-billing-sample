@@ -25,3 +25,39 @@ services:
       minio server /export --address :9000 --console-address :9001;"
     volumes:
       - ./data/minio:/export
+  mysql:
+    image: mysql:8.0.43-debian
+    container_name: mysql
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: usage_based_billing
+      MYSQL_USER: user
+      MYSQL_PASSWORD: password
+      TZ: "Asia/Tokyo"
+    volumes:
+      - ./data/mysql/data:/var/lib/mysql
+      - ./data/mysql/my.cnf:/etc/mysql/conf.d/my.cnf
+      - ./pkg/db/init:/docker-entrypoint-initdb.d
+    ports:
+      - 3306:3306
+    networks:
+      - container-network
+  phpmyadmin:
+    container_name: manage-phpmyadmin
+    image: phpmyadmin/phpmyadmin
+    environment:
+      PMA_ARBITRARY: 1
+      PMA_HOST: mysql
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_USER: user
+      MYSQL_PASSWORD: password
+    ports:
+      - 8081:80
+    networks:
+      - container-network
+    depends_on:
+      - mysql
+
+networks:
+  container-network:
+    driver: bridge
