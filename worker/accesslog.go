@@ -157,9 +157,9 @@ func convertToParquet(logs []types.ApiAccessLog) ([]byte, error) {
 	rec := rb.NewRecord()
 	defer rec.Release()
 
-	buf := new(bytes.Buffer)
+	var buf bytes.Buffer
 	props := parquet.NewWriterProperties(parquet.WithCompression(compress.Codecs.Snappy))
-	writer, err := pqarrow.NewFileWriter(parquetSchema, buf, props, pqarrow.NewArrowWriterProperties())
+	writer, err := pqarrow.NewFileWriter(parquetSchema, &buf, props, pqarrow.NewArrowWriterProperties())
 	if err != nil {
 		return nil, fmt.Errorf("failed to create parquet file writer: %w", err)
 	}
