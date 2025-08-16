@@ -72,7 +72,7 @@ func (w *Worker) Run(ctx context.Context) {
 	for msg := range msgs {
 		slog.Info("Received message", "body", string(msg.Body))
 
-		var accessLog types.AccessLog
+		var accessLog types.ApiAccessLog
 		if err := json.Unmarshal(msg.Body, &accessLog); err != nil {
 			slog.Error("Failed to unmarshal message", "error", err)
 			msg.Nack(false, false)

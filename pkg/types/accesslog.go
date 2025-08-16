@@ -2,7 +2,7 @@ package types
 
 import "time"
 
-type AccessLog struct {
+type ApiAccessLog struct {
 	Timestamp  time.Time `json:"timestamp"`
 	ClientIP   string    `json:"client_ip"`
 	Path       string    `json:"path"`
