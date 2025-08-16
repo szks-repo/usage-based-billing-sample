@@ -20,10 +20,14 @@ run = 'migrate --path pkg/db/migration --database mysql://user:password@tcp(loca
 [tasks.migrate-down]
 run = 'migrate --path pkg/db/migration --database mysql://user:password@tcp(localhost:3306)/usage_based_billing -verbose down'
 
+[tasks.run-seed]
+run = 'go run main.go seedDb'
+description = "seed db"
+
 [tasks.run-worker]
 run = 'go run main.go receiverWorker'
-description = 'Build the app'
+description = 'run cmd/receiverWorker'
 
 [tasks.run-provider]
 run = 'go run main.go providerApi'
-description = 'Build the app'
+description = 'run cmd/providerApi'
