@@ -11,6 +11,7 @@ import (
 
 	"github.com/szks-repo/usage-based-billing-sample/pkg/rabbitmq"
 	"github.com/szks-repo/usage-based-billing-sample/pkg/types"
+	"github.com/szks-repo/usage-based-billing-sample/pkg/types/ctxkey"
 )
 
 type Middleware interface {
@@ -52,7 +53,7 @@ func (mw *middleware) Wrap(next http.Handler) http.Handler {
 			statusCode:     http.StatusOK,
 		}
 
-		ctx := context.WithValue(r.Context(), "apiKey", apiKey)
+		ctx := context.WithValue(r.Context(), ctxkey.ApiKey{}, apiKey)
 
 		next.ServeHTTP(w2, r.WithContext(ctx))
 		slog.Info("End main handler", "path", r.URL.Path, "satusCode", w2.statusCode)
