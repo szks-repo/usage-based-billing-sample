@@ -2,6 +2,7 @@ package provider
 
 import (
 	"log/slog"
+	"math/rand/v2"
 	"net/http"
 	"time"
 )
@@ -24,6 +25,8 @@ func (h *ApiHandler) HandleHelth(w http.ResponseWriter, r *http.Request) {
 func (h *ApiHandler) HandleApi1(w http.ResponseWriter, r *http.Request) {
 	slog.Info("Handling API 1 request")
 
+	time.Sleep(time.Millisecond * time.Duration(rand.IntN(500)))
+
 	w.WriteHeader(http.StatusOK)
 	w.Write([]byte("Hello from API 1!"))
 }
@@ -31,7 +34,7 @@ func (h *ApiHandler) HandleApi1(w http.ResponseWriter, r *http.Request) {
 func (h *ApiHandler) HandleApi2(w http.ResponseWriter, r *http.Request) {
 	slog.Info("Handling API 2 request")
 
-	time.Sleep(time.Second * 3)
+	time.Sleep(time.Millisecond * time.Duration(rand.IntN(1000)))
 
 	w.WriteHeader(http.StatusOK)
 	w.Write([]byte("Hello from API 2!"))
