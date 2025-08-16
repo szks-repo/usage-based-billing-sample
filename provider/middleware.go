@@ -41,6 +41,7 @@ func (mw *middleware) Wrap(next http.Handler) http.Handler {
 		apiKey := r.Header.Get("x-api-key")
 
 		if err := mw.apiKeyChecker.Check(r.Context(), apiKey); err != nil {
+			slog.Info("Invalid api key", "apiKey", apiKey, "error", err)
 			http.Error(w, "Unauthorized: missing or invalid api key", http.StatusUnauthorized)
 			return
 		}
@@ -69,7 +70,7 @@ func (mw *middleware) Wrap(next http.Handler) http.Handler {
 			UserAgent:  r.UserAgent(),
 		})
 		if err != nil {
-			slog.Error("failed to json.Marshal", "error", err)
+			slog.Error("Failed to json.Marshal", "error", err)
 			return
 		}
 
