@@ -1,3 +1,6 @@
 package ctxkey
 
-type ApiKey struct{}
+type (
+	ApiKey    struct{}
+	AccountId struct{}
+)

@@ -8,8 +8,10 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/hashicorp/golang-lru/v2/expirable"
 	"github.com/spf13/cobra"
 
+	"github.com/szks-repo/usage-based-billing-sample/pkg/db"
 	"github.com/szks-repo/usage-based-billing-sample/pkg/rabbitmq"
 	"github.com/szks-repo/usage-based-billing-sample/provider"
 )
@@ -31,6 +33,9 @@ to quickly create a Cobra application.`,
 		nctx, stop := signal.NotifyContext(ctx, os.Interrupt, syscall.SIGTERM)
 		defer stop()
 
+		db.MustInit()
+		defer db.Close()
+
 		mqConn, err := rabbitmq.NewConn("amqp://localhost:5672")
 		defer mqConn.Close()
 		if err != nil {
@@ -51,8 +56,14 @@ to quickly create a Cobra application.`,
 		}
 
 		// todo: install github.com/mazrean/kessoku
+		cacheExpries := time.Minute * 30
+
 		srv := provider.NewApiServer(":8080", provider.NewMiddleware(
-			provider.NewApiKeyChecker(),
+			provider.NewApiKeyChecker(
+				db.Get(),
+				expirable.NewLRU[string, int64](2000, nil, cacheExpries),
+				cacheExpries,
+			),
 			mqConn,
 			queue,
 		))
