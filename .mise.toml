@@ -11,6 +11,9 @@ run = [
     "docker compose up -d"
 ]
 
+[tasks.dbtpl]
+run = 'dbtpl schema mysql://user:password@localhost:3306/usage_based_billing -o pkg/db/dto'
+
 [tasks.migrate-up]
 run = 'migrate --path pkg/db/migration --database mysql://user:password@tcp(localhost:3306)/usage_based_billing -verbose up'
 
