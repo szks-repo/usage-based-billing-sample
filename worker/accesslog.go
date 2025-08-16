@@ -11,9 +11,9 @@ import (
 	"github.com/apache/arrow/go/v17/arrow"
 	"github.com/apache/arrow/go/v17/arrow/array"
 	"github.com/apache/arrow/go/v17/arrow/memory"
+	"github.com/apache/arrow/go/v17/parquet/pqarrow"
 	"github.com/apache/arrow/go/v17/parquet"
 	"github.com/apache/arrow/go/v17/parquet/compress"
-	"github.com/apache/arrow/go/v17/parquet/pqarrow"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/google/uuid"
 
@@ -127,7 +127,6 @@ func (u *S3Writer) flush(ctx context.Context) {
 
 var parquetSchema = arrow.NewSchema(
 	[]arrow.Field{
-		{Name: "timestamp", Type: arrow.FixedWidthTypes.Timestamp_ms},
 		{Name: "client_ip", Type: arrow.BinaryTypes.String},
 		{Name: "method", Type: arrow.BinaryTypes.String},
 		{Name: "path", Type: arrow.BinaryTypes.String},
@@ -135,40 +134,46 @@ var parquetSchema = arrow.NewSchema(
 		{Name: "status_code", Type: arrow.PrimitiveTypes.Int32},
 		{Name: "latency_ms", Type: arrow.PrimitiveTypes.Int64},
 		{Name: "user_agent", Type: arrow.BinaryTypes.String},
+		{Name: "timestamp", Type: arrow.FixedWidthTypes.Timestamp_ms},
 	},
 	nil, // metadata
 )
 
 func convertToParquet(logs []types.AccessLog) ([]byte, error) {
 	pool := memory.NewGoAllocator()
-	recBuilder := array.NewRecordBuilder(pool, parquetSchema)
-	defer recBuilder.Release()
+	rb := array.NewRecordBuilder(pool, parquetSchema)
+	defer rb.Release()
 
 	for _, l := range logs {
-		recBuilder.Field(0).(*array.TimestampBuilder).Append(arrow.Timestamp(l.Timestamp.UnixMilli()))
-		recBuilder.Field(1).(*array.StringBuilder).Append(l.ClientIP)
-		recBuilder.Field(2).(*array.StringBuilder).Append(l.Method)
-		recBuilder.Field(3).(*array.StringBuilder).Append(l.Path)
-		recBuilder.Field(4).(*array.StringBuilder).Append(l.Protocol)
-		recBuilder.Field(5).(*array.Int32Builder).Append(int32(l.StatusCode))
-		recBuilder.Field(6).(*array.Int64Builder).Append(l.Latency)
-		recBuilder.Field(7).(*array.StringBuilder).Append(l.UserAgent)
+		rb.Field(0).(*array.StringBuilder).Append(l.ClientIP)
+		rb.Field(1).(*array.StringBuilder).Append(l.Method)
+		rb.Field(2).(*array.StringBuilder).Append(l.Path)
+		rb.Field(3).(*array.StringBuilder).Append(l.Protocol)
+		rb.Field(4).(*array.Int32Builder).Append(int32(l.StatusCode))
+		rb.Field(5).(*array.Int64Builder).Append(l.Latency)
+		rb.Field(6).(*array.StringBuilder).Append(l.UserAgent)
+		rb.Field(7).(*array.TimestampBuilder).Append(arrow.Timestamp(l.Timestamp.UnixMilli()))
 	}
 
-	rec := recBuilder.NewRecord()
+	rec := rb.NewRecord()
 	defer rec.Release()
 
 	// 4. Parquetファイルに書き込む
 	buf := new(bytes.Buffer)
+	// props := parquet.NewWriterProperties(parquet.WithCompression(compress.Codecs.Uncompressed))
 	props := parquet.NewWriterProperties(parquet.WithCompression(compress.Codecs.Snappy))
 	writer, err := pqarrow.NewFileWriter(parquetSchema, buf, props, pqarrow.NewArrowWriterProperties())
 	if err != nil {
 		return nil, fmt.Errorf("failed to create parquet file writer: %w", err)
 	}
-	defer writer.Close()
 
 	if err := writer.Write(rec); err != nil {
+		writer.Close()
 		return nil, fmt.Errorf("failed to write record to parquet: %w", err)
+	}
+
+	if err := writer.Close(); err != nil {
+		return nil, fmt.Errorf("failed to close parquet writer: %w", err)
 	}
 
 	return buf.Bytes(), nil
