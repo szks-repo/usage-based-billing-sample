@@ -49,7 +49,7 @@ func (h *ApiHandler) HandleApi1(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// todo move to after middleware
-	payload, err := json.Marshal(&types.AccessLog{
+	payload, err := json.Marshal(&types.ApiAccessLog{
 		Timestamp:  time.Now(),
 		ClientIP:   r.RemoteAddr,
 		Path:       r.URL.Path,

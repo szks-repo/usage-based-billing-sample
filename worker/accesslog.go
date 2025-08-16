@@ -25,8 +25,8 @@ type S3Writer struct {
 	s3Client   *s3.Client
 	bucketName string
 
-	logChan    chan types.AccessLog
-	buffer     []types.AccessLog
+	logChan    chan types.ApiAccessLog
+	buffer     []types.ApiAccessLog
 	bufferSize int
 	ticker     *time.Ticker
 	mutex      sync.Mutex
@@ -44,15 +44,15 @@ func NewS3Writer(
 	return &S3Writer{
 		s3Client:   client,
 		bucketName: bucket,
-		logChan:    make(chan types.AccessLog, bufferSize*2),
-		buffer:     make([]types.AccessLog, 0, bufferSize),
+		logChan:    make(chan types.ApiAccessLog, bufferSize*2),
+		buffer:     make([]types.ApiAccessLog, 0, bufferSize),
 		bufferSize: bufferSize,
 		ticker:     time.NewTicker(interval),
 		shutdown:   make(chan struct{}),
 	}
 }
 
-func (u *S3Writer) AddLog(log types.AccessLog) {
+func (u *S3Writer) AddLog(log types.ApiAccessLog) {
 	u.logChan <- log
 }
 
@@ -95,7 +95,7 @@ func (u *S3Writer) flush(ctx context.Context) {
 		return
 	}
 
-	logsToUpload := make([]types.AccessLog, len(u.buffer))
+	logsToUpload := make([]types.ApiAccessLog, len(u.buffer))
 	copy(logsToUpload, u.buffer)
 	u.buffer = u.buffer[:0] // バッファをクリア
 
@@ -138,7 +138,7 @@ var parquetSchema = arrow.NewSchema(
 	nil, // metadata
 )
 
-func convertToParquet(logs []types.AccessLog) ([]byte, error) {
+func convertToParquet(logs []types.ApiAccessLog) ([]byte, error) {
 	pool := memory.NewGoAllocator()
 	rb := array.NewRecordBuilder(pool, parquetSchema)
 	defer rb.Release()
