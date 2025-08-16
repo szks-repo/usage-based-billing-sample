@@ -61,7 +61,12 @@ func (u *S3Writer) Start(ctx context.Context) {
 		for {
 			select {
 			case <-ctx.Done():
+				u.flush(context.WithoutCancel(ctx))
 				slog.Info("ctx.Done", "error", ctx.Err())
+				return
+			case <-u.shutdown:
+				u.flush(context.WithoutCancel(ctx))
+				slog.Info("S3 uploader shutting down.")
 				return
 			case l := <-u.logChan:
 				u.mutex.Lock()
@@ -73,10 +78,6 @@ func (u *S3Writer) Start(ctx context.Context) {
 				}
 			case <-u.ticker.C:
 				u.flush(ctx)
-			case <-u.shutdown:
-				u.flush(ctx)
-				slog.Info("S3 uploader shutting down.")
-				return
 			}
 		}
 	}()
