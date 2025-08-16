@@ -52,9 +52,8 @@ func (mw *middleware) Wrap(next http.Handler) http.Handler {
 		}
 
 		ctx := context.WithValue(r.Context(), "apiKey", apiKey)
-		r = r.WithContext(ctx)
 
-		next.ServeHTTP(w2, r)
+		next.ServeHTTP(w2, r.WithContext(ctx))
 		slog.Info("End main handler", "path", r.URL.Path, "satusCode", w2.statusCode)
 		if w2.statusCode < 200 || w2.statusCode >= 300 {
 			return
