@@ -1,1 +1,1 @@
-DROP TABLE `active_api_key`;
+DROP TABLE IF EXISTS `active_api_key`;
