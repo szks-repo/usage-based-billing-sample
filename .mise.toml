@@ -3,6 +3,9 @@ GOEXPERIMENT = 'jsonv2'
 AWS_ACCESS_KEY_ID = 'user'
 AWS_SECRET_ACCESS_KEY = 'password'
 
+[tasks.fmt]
+run = 'go fmt ./...'
+
 [tasks.container-start]
 run = [
     "docker compose up -d"
