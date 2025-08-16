@@ -37,9 +37,25 @@ to quickly create a Cobra application.`,
 			slog.Error("Failed to connect to RabbitMQ", "error", err)
 			return
 		}
+		queue, err := mqConn.Channel.QueueDeclare(
+			"api1_queue",
+			true,
+			false,
+			false,
+			false,
+			nil,
+		)
+		if err != nil {
+			slog.Error("Failed to declare queue", "error", err)
+			panic(err)
+		}
 
 		// todo: install github.com/mazrean/kessoku
-		srv := provider.NewApiServer(mqConn, provider.NewApiKeyChecker(), ":8080")
+		srv := provider.NewApiServer(":8080", provider.NewMiddleware(
+			provider.NewApiKeyChecker(),
+			mqConn,
+			queue,
+		))
 		go func() {
 			if err := srv.ListenAndServe(); err != nil {
 				slog.Error("provider API server", "error", err)
