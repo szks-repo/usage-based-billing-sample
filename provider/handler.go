@@ -25,7 +25,7 @@ func (h *ApiHandler) HandleHelth(w http.ResponseWriter, r *http.Request) {
 func (h *ApiHandler) HandleApi1(w http.ResponseWriter, r *http.Request) {
 	slog.Info("Handling API 1 request")
 
-	time.Sleep(time.Millisecond * time.Duration(rand.IntN(500)))
+	time.Sleep(time.Millisecond * time.Duration(rand.IntN(50)))
 
 	w.WriteHeader(http.StatusOK)
 	w.Write([]byte("Hello from API 1!"))
@@ -34,7 +34,7 @@ func (h *ApiHandler) HandleApi1(w http.ResponseWriter, r *http.Request) {
 func (h *ApiHandler) HandleApi2(w http.ResponseWriter, r *http.Request) {
 	slog.Info("Handling API 2 request")
 
-	time.Sleep(time.Millisecond * time.Duration(rand.IntN(1000)))
+	time.Sleep(time.Millisecond * time.Duration(rand.IntN(200)))
 
 	w.WriteHeader(http.StatusOK)
 	w.Write([]byte("Hello from API 2!"))
