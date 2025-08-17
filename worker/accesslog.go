@@ -139,6 +139,7 @@ func (r *AccessLogRecorder) flush(ctx context.Context) {
 	wg.Go(func() {
 		r.saveAggregated(ctx, logsToUpload)
 	})
+	wg.Wait()
 }
 
 var parquetSchema = arrow.NewSchema(
