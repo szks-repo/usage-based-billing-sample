@@ -18,6 +18,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/google/uuid"
 
+	"github.com/szks-repo/usage-based-billing-sample/pkg/db"
 	"github.com/szks-repo/usage-based-billing-sample/pkg/db/dto"
 	"github.com/szks-repo/usage-based-billing-sample/pkg/types"
 )
@@ -224,25 +225,25 @@ func (r *AccessLogRecorder) saveAggregated(ctx context.Context, accessLogs []typ
 	}
 
 	slog.Info("Upsert minute aggregate records", "num", len(dst))
-	// consider: xo/dbtplにbulk insertない
-	stmt, err := r.dbConn.PrepareContext(
-		ctx, "INSERT INTO every_minute_api_usage (`account_id`, `minute`, `usage`) VALUES (?, ?, ?) "+
+
+	args := make([]any, 0, len(dst)*3)
+	for _, v := range dst {
+		args = append(args, v.AccountID, v.Minute, v.Usage)
+	}
+
+	result, err := r.dbConn.ExecContext(
+		ctx,
+		"INSERT INTO every_minute_api_usage (`account_id`, `minute`, `usage`) "+db.MakeValues(3, len(dst))+" "+
 			"ON DUPLICATE KEY UPDATE "+
 			"`usage` = `usage` + VALUES(`usage`), `updated_at` = NOW()",
+		args...,
 	)
 	if err != nil {
 		slog.Error("Failed to PrepareContext", "error", err)
 		return err
 	}
-	defer stmt.Close()
-
-	for _, v := range dst {
-		slog.Info("Upsert usage", "accountId", v.AccountID, "minute", v.Minute)
-		if _, err := stmt.ExecContext(ctx, v.AccountID, v.Minute, v.Usage); err != nil {
-			slog.Error("Failed to ExecContext", "error", err)
-			return err
-		}
-	}
+	ra, _ := result.RowsAffected()
+	slog.Info("Upsert every_minute_api_usage", "rowsAffected", ra)
 
 	return nil
 }
