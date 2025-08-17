@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/cenkalti/backoff/v4"
 	"github.com/streadway/amqp"
 
 	"github.com/szks-repo/usage-based-billing-sample/pkg/rabbitmq"
@@ -78,24 +79,27 @@ func (mw *middleware) Wrap(next http.Handler) http.Handler {
 			return
 		}
 
-		if err := mw.mqConn.Channel.Publish(
-			"",            // exchange
-			mw.queue.Name, // routing key
-			false,         // mandatory
-			false,         // immediate
-			amqp.Publishing{
-				ContentType:  "application/json",
-				Body:         payload,
-				DeliveryMode: amqp.Persistent,
-				Headers: map[string]any{
-					"timestamp": time.Now().Format(time.RFC3339Nano),
+		if err := backoff.Retry(func() error {
+			return mw.mqConn.Channel.Publish(
+				"",            // exchange
+				mw.queue.Name, // routing key
+				false,         // mandatory
+				false,         // immediate
+				amqp.Publishing{
+					ContentType:  "application/json",
+					Body:         payload,
+					DeliveryMode: amqp.Persistent,
+					Headers: map[string]any{
+						"timestamp": time.Now().Format(time.RFC3339Nano),
+					},
+					Timestamp: time.Now(),
 				},
-				Timestamp: time.Now(),
-			},
-		); err != nil {
+			)
+		}, backoff.WithMaxRetries(backoff.NewExponentialBackOff(), 5)); err != nil {
 			slog.Error("Failed to publish message to RabbitMQ", "error", err)
 			return
 		}
+
 	})
 }
 
