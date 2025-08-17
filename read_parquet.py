@@ -1,13 +1,13 @@
 import pandas as pd
 import sys
 
-file_path = './data/0198b15b-938b-7220-a91c-291b0bad0de9.parquet' 
+file_path = './data/0198b8b3-e491-7345-b313-332dc01fc298.parquet' 
 
 try:
     df = pd.read_parquet(file_path)
 
     print("------------------------------------")
-    print(df.head())
+    print(df)
     print("\n------------------------------------")
 
 except Exception as e:
