@@ -9,8 +9,8 @@ import (
 
 // ActiveAPIKey represents a row from 'usage_based_billing.active_api_key'.
 type ActiveAPIKey struct {
-	ID        int       `json:"id"`         // id
-	AccountID int       `json:"account_id"` // account_id
+	ID        uint64    `json:"id"`         // id
+	AccountID uint64    `json:"account_id"` // account_id
 	APIKey    string    `json:"api_key"`    // api_key
 	ExpiredAt time.Time `json:"expired_at"` // expired_at
 	CreatedAt time.Time `json:"created_at"` // created_at
@@ -54,7 +54,7 @@ func (aak *ActiveAPIKey) Insert(ctx context.Context, db DB) error {
 	if err != nil {
 		return logerror(err)
 	} // set primary key
-	aak.ID = int(id)
+	aak.ID = uint64(id)
 	// set exists
 	aak._exists = true
 	return nil
@@ -136,7 +136,7 @@ func (aak *ActiveAPIKey) Delete(ctx context.Context, db DB) error {
 // ActiveAPIKeyByID retrieves a row from 'usage_based_billing.active_api_key' as a [ActiveAPIKey].
 //
 // Generated from index 'active_api_key_id_pkey'.
-func ActiveAPIKeyByID(ctx context.Context, db DB, id int) (*ActiveAPIKey, error) {
+func ActiveAPIKeyByID(ctx context.Context, db DB, id uint64) (*ActiveAPIKey, error) {
 	// query
 	const sqlstr = `SELECT ` +
 		`id, account_id, api_key, expired_at, created_at ` +

@@ -5,15 +5,17 @@ package dto
 
 import (
 	"context"
+	"database/sql"
 	"time"
 )
 
 // Account represents a row from 'usage_based_billing.account'.
 type Account struct {
-	ID          int       `json:"id"`           // id
-	AccountName string    `json:"account_name"` // account_name
-	CreatedAt   time.Time `json:"created_at"`   // created_at
-	UpdatedAt   time.Time `json:"updated_at"`   // updated_at
+	ID          uint64         `json:"id"`           // id
+	AccountName string         `json:"account_name"` // account_name
+	Timezone    sql.NullString `json:"timezone"`     // timezone
+	CreatedAt   time.Time      `json:"created_at"`   // created_at
+	UpdatedAt   time.Time      `json:"updated_at"`   // updated_at
 	// xo fields
 	_exists, _deleted bool
 }
@@ -39,13 +41,13 @@ func (a *Account) Insert(ctx context.Context, db DB) error {
 	}
 	// insert (primary key generated and returned by database)
 	const sqlstr = `INSERT INTO usage_based_billing.account (` +
-		`account_name, created_at, updated_at` +
+		`account_name, timezone, created_at, updated_at` +
 		`) VALUES (` +
-		`?, ?, ?` +
+		`?, ?, ?, ?` +
 		`)`
 	// run
-	logf(sqlstr, a.AccountName, a.CreatedAt, a.UpdatedAt)
-	res, err := db.ExecContext(ctx, sqlstr, a.AccountName, a.CreatedAt, a.UpdatedAt)
+	logf(sqlstr, a.AccountName, a.Timezone, a.CreatedAt, a.UpdatedAt)
+	res, err := db.ExecContext(ctx, sqlstr, a.AccountName, a.Timezone, a.CreatedAt, a.UpdatedAt)
 	if err != nil {
 		return logerror(err)
 	}
@@ -54,7 +56,7 @@ func (a *Account) Insert(ctx context.Context, db DB) error {
 	if err != nil {
 		return logerror(err)
 	} // set primary key
-	a.ID = int(id)
+	a.ID = uint64(id)
 	// set exists
 	a._exists = true
 	return nil
@@ -70,11 +72,11 @@ func (a *Account) Update(ctx context.Context, db DB) error {
 	}
 	// update with primary key
 	const sqlstr = `UPDATE usage_based_billing.account SET ` +
-		`account_name = ?, created_at = ?, updated_at = ? ` +
+		`account_name = ?, timezone = ?, created_at = ?, updated_at = ? ` +
 		`WHERE id = ?`
 	// run
-	logf(sqlstr, a.AccountName, a.CreatedAt, a.UpdatedAt, a.ID)
-	if _, err := db.ExecContext(ctx, sqlstr, a.AccountName, a.CreatedAt, a.UpdatedAt, a.ID); err != nil {
+	logf(sqlstr, a.AccountName, a.Timezone, a.CreatedAt, a.UpdatedAt, a.ID)
+	if _, err := db.ExecContext(ctx, sqlstr, a.AccountName, a.Timezone, a.CreatedAt, a.UpdatedAt, a.ID); err != nil {
 		return logerror(err)
 	}
 	return nil
@@ -96,15 +98,15 @@ func (a *Account) Upsert(ctx context.Context, db DB) error {
 	}
 	// upsert
 	const sqlstr = `INSERT INTO usage_based_billing.account (` +
-		`id, account_name, created_at, updated_at` +
+		`id, account_name, timezone, created_at, updated_at` +
 		`) VALUES (` +
-		`?, ?, ?, ?` +
+		`?, ?, ?, ?, ?` +
 		`)` +
 		` ON DUPLICATE KEY UPDATE ` +
-		`account_name = VALUES(account_name), created_at = VALUES(created_at), updated_at = VALUES(updated_at)`
+		`account_name = VALUES(account_name), timezone = VALUES(timezone), created_at = VALUES(created_at), updated_at = VALUES(updated_at)`
 	// run
-	logf(sqlstr, a.ID, a.AccountName, a.CreatedAt, a.UpdatedAt)
-	if _, err := db.ExecContext(ctx, sqlstr, a.ID, a.AccountName, a.CreatedAt, a.UpdatedAt); err != nil {
+	logf(sqlstr, a.ID, a.AccountName, a.Timezone, a.CreatedAt, a.UpdatedAt)
+	if _, err := db.ExecContext(ctx, sqlstr, a.ID, a.AccountName, a.Timezone, a.CreatedAt, a.UpdatedAt); err != nil {
 		return logerror(err)
 	}
 	// set exists
@@ -136,10 +138,10 @@ func (a *Account) Delete(ctx context.Context, db DB) error {
 // AccountByID retrieves a row from 'usage_based_billing.account' as a [Account].
 //
 // Generated from index 'account_id_pkey'.
-func AccountByID(ctx context.Context, db DB, id int) (*Account, error) {
+func AccountByID(ctx context.Context, db DB, id uint64) (*Account, error) {
 	// query
 	const sqlstr = `SELECT ` +
-		`id, account_name, created_at, updated_at ` +
+		`id, account_name, timezone, created_at, updated_at ` +
 		`FROM usage_based_billing.account ` +
 		`WHERE id = ?`
 	// run
@@ -147,7 +149,7 @@ func AccountByID(ctx context.Context, db DB, id int) (*Account, error) {
 	a := Account{
 		_exists: true,
 	}
-	if err := db.QueryRowContext(ctx, sqlstr, id).Scan(&a.ID, &a.AccountName, &a.CreatedAt, &a.UpdatedAt); err != nil {
+	if err := db.QueryRowContext(ctx, sqlstr, id).Scan(&a.ID, &a.AccountName, &a.Timezone, &a.CreatedAt, &a.UpdatedAt); err != nil {
 		return nil, logerror(err)
 	}
 	return &a, nil
