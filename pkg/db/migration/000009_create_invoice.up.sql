@@ -1,7 +1,7 @@
 CREATE TABLE IF NOT EXISTS `invoice` (
     `id` bigint UNSIGNED NOT NULL AUTO_INCREMENT,
     `account_id` bigint UNSIGNED NOT NULL,
-    `contract_id` bigint UNSIGNED NOT NULL,
+    `subscription_id` bigint UNSIGNED NOT NULL,
     `total_usage` int UNSIGNED NOT NULL DEFAULT 0,
     `tax_rate` tinyint UNSIGNED NOT NULL DEFAULT 10,
     `subtotal` int UNSIGNED NOT NULL DEFAULT 0,
@@ -11,5 +11,5 @@ CREATE TABLE IF NOT EXISTS `invoice` (
     PRIMARY KEY (`id`),
     KEY(`created_at`),
     FOREIGN KEY (`account_id`) REFERENCES `account`(`id`),
-    FOREIGN KEY (`contract_id`) REFERENCES `account_contract`(`id`)
+    FOREIGN KEY (`subscription_id`) REFERENCES `subscription`(`id`)
 ) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
