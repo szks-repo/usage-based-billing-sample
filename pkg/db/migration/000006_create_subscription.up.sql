@@ -1,4 +1,4 @@
-CREATE TABLE IF NOT EXISTS `account_contract` (
+CREATE TABLE IF NOT EXISTS `subscription` (
     `id` bigint UNSIGNED NOT NULL AUTO_INCREMENT,
     `account_id` bigint UNSIGNED NOT NULL,
     `from` DATETIME NOT NULL, 
