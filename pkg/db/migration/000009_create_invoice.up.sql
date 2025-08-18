@@ -9,6 +9,7 @@ CREATE TABLE IF NOT EXISTS `invoice` (
     `total_price` int UNSIGNED NOT NULL DEFAULT 0,
     `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP(),
     PRIMARY KEY (`id`),
+    KEY(`created_at`),
     FOREIGN KEY (`account_id`) REFERENCES `account`(`id`),
     FOREIGN KEY (`contract_id`) REFERENCES `account_contract`(`id`)
 ) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
