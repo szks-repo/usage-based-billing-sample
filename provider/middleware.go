@@ -10,6 +10,7 @@ import (
 	"github.com/cenkalti/backoff/v4"
 	"github.com/streadway/amqp"
 
+	"github.com/szks-repo/usage-based-billing-sample/pkg/now"
 	"github.com/szks-repo/usage-based-billing-sample/pkg/rabbitmq"
 	"github.com/szks-repo/usage-based-billing-sample/pkg/types"
 	"github.com/szks-repo/usage-based-billing-sample/pkg/types/ctxkey"
@@ -39,7 +40,7 @@ func NewMiddleware(
 
 func (mw *middleware) Wrap(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		start := time.Now()
+		start := now.FromContext(r.Context())
 
 		apiKey := r.Header.Get("x-api-key")
 
@@ -64,9 +65,10 @@ func (mw *middleware) Wrap(next http.Handler) http.Handler {
 			return
 		}
 
+		ts := now.FromContext(ctx)
 		payload, err := json.Marshal(&types.ApiAccessLog{
 			AccountId:  accountId,
-			Timestamp:  time.Now(),
+			Timestamp:  ts,
 			ClientIP:   r.RemoteAddr,
 			Path:       r.URL.Path,
 			Method:     r.Method,
@@ -90,9 +92,9 @@ func (mw *middleware) Wrap(next http.Handler) http.Handler {
 					Body:         payload,
 					DeliveryMode: amqp.Persistent,
 					Headers: map[string]any{
-						"timestamp": time.Now().Format(time.RFC3339Nano),
+						"timestamp": ts,
 					},
-					Timestamp: time.Now(),
+					Timestamp: ts,
 				},
 			)
 		}, backoff.WithMaxRetries(backoff.NewExponentialBackOff(), 5)); err != nil {
