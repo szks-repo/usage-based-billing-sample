@@ -239,7 +239,7 @@ func (r *AccessLogRecorder) saveAggregated(ctx context.Context, accessLogs []typ
 		args...,
 	)
 	if err != nil {
-		slog.Error("Failed to PrepareContext", "error", err)
+		slog.Error("Failed to ExecContext", "error", err)
 		return err
 	}
 	ra, _ := result.RowsAffected()
