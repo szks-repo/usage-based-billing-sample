@@ -3,6 +3,7 @@ package invoice
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"log/slog"
 	"time"
 
@@ -54,9 +55,31 @@ func (i *InvoiceMaker) CreateInvoiceDaily(ctx context.Context) {
 	)
 }
 
-func (i *InvoiceMaker) createInvoice(ctx context.Context, accountId int64) (*dto.Invoice, error) {
-	// todo
-	return nil, nil
+func (i *InvoiceMaker) createInvoice(ctx context.Context, subscription *dto.Subscription) (*dto.Invoice, error) {
+	// todo IF
+	row := i.dbConn.QueryRowContext(ctx, "SELECT SUM(`usage`) FROM daily_api_usage WHERE account_id = ? AND date >= ? AND date <= ?",
+		subscription.AccountID,
+		subscription.From.Format("20060102"),
+		subscription.EstimatedTo.Format("20060102"),
+	)
+	var total int64
+	if err := row.Scan(&total); err != nil && errors.Is(err, sql.ErrNoRows) {
+		return nil, err
+	}
+
+	invoiceDto := &dto.Invoice{
+		AccountID:          subscription.AccountID,
+		SubscriptionID:     subscription.ID,
+		TotalUsage:         uint(total),
+		FreeCreditDiscount: 0, //todo
+		Subtotal:           0, //todo
+		TotalPrice:         0, //todo
+	}
+	if err := invoiceDto.Insert(ctx, i.dbConn); err != nil {
+		return nil, err
+	}
+
+	return invoiceDto, nil
 }
 
 func (i *InvoiceMaker) publishNotifyQueue(ctx context.Context, invoice *dto.Invoice) { /* todo */ }
