@@ -61,23 +61,31 @@ func (i *InvoiceMaker) createInvoice(ctx context.Context, accountId int64) (*dto
 
 func (i *InvoiceMaker) publishNotifyQueue(ctx context.Context, invoice *dto.Invoice) { /* todo */ }
 
-func (i *InvoiceMaker) listAccountIds(ctx context.Context, t time.Time) ([]int64, error) {
+func (i *InvoiceMaker) listSubscriptions(ctx context.Context, t time.Time) ([]*dto.Subscription, error) {
 	cutoff := time.Date(t.Year(), t.Month(), t.Day(), 0, 0, 0, 0, time.Local)
 
-	rows, err := i.dbConn.QueryContext(ctx, `SELECT a.id FROM account a JOIN subscription s ON a.id = s.account_id WHERE s.estimated_to = ?`, cutoff)
+	query := "SELECT s.id, s.account_id, s.from, s.estimated_to " +
+		"FROM account a JOIN subscription s ON a.id = s.account_id " +
+		"WHERE s.estimated_to = ?"
+	rows, err := i.dbConn.QueryContext(ctx, query, cutoff)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
 
-	var accountIds []int64
+	var subscriptions []*dto.Subscription
 	for rows.Next() {
-		var accountId int64
-		if err := rows.Scan(&accountId); err != nil {
+		var dst dto.Subscription
+		if err := rows.Scan(
+			&dst.ID,
+			&dst.AccountID,
+			&dst.From,
+			&dst.EstimatedTo,
+		); err != nil {
 			return nil, err
 		}
-		accountIds = append(accountIds, accountId)
+		subscriptions = append(subscriptions, &dst)
 	}
 
-	return accountIds, nil
+	return subscriptions, nil
 }
