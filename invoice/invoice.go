@@ -30,26 +30,26 @@ func NewInvoiceMaker(
 func (i *InvoiceMaker) CreateInvoiceDaily(ctx context.Context) {
 	baseDate := now.FromContext(ctx).AddDate(0, 0, -1)
 
-	accountIds, err := i.listAccountIds(ctx, baseDate)
+	subscriptions, err := i.listSubscriptions(ctx, baseDate)
 	if err != nil {
 		slog.Error("Failed to listAccountIds", "error", err)
 	}
 
-	slog.Info("target accountIds", "accountIds", accountIds)
-	if len(accountIds) == 0 {
+	slog.Info("target subscriptions", "len", len(subscriptions))
+	if len(subscriptions) == 0 {
 		return
 	}
 
 	pipeline.Pipeline3(
 		ctx,
-		pipeline.From(accountIds),
-		pipeline.ForEach[int64](func(accountId int64) {
-			i.reconciler.Do(ctx, baseDate, accountId)
+		pipeline.From(subscriptions),
+		pipeline.ForEach(func(subscription *dto.Subscription) {
+			i.reconciler.Do(ctx, baseDate, subscription)
 		}),
-		pipeline.Map[int64, *dto.Invoice](func(accountId int64) (*dto.Invoice, error) {
-			return i.createInvoice(ctx, accountId)
+		pipeline.Map(func(subscription *dto.Subscription) (*dto.Invoice, error) {
+			return i.createInvoice(ctx, subscription)
 		}),
-		pipeline.ForEach[*dto.Invoice](func(invoice *dto.Invoice) {
+		pipeline.ForEach(func(invoice *dto.Invoice) {
 			i.publishNotifyQueue(ctx, invoice)
 		}),
 	)
