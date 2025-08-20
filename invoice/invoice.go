@@ -73,6 +73,7 @@ func (i *InvoiceMaker) createInvoice(ctx context.Context, subscription *dto.Subs
 		TotalUsage:         uint(total),
 		FreeCreditDiscount: 0, //todo
 		Subtotal:           0, //todo
+		TaxRate:            10,
 		TotalPrice:         0, //todo
 	}
 	if err := invoiceDto.Insert(ctx, i.dbConn); err != nil {
