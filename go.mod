@@ -14,6 +14,7 @@ require (
 	github.com/spf13/cobra v1.9.1
 	github.com/streadway/amqp v1.1.0
 	github.com/szks-repo/gopipeline v0.0.1
+	github.com/szks-repo/rat-expr-parser v0.2.0
 	github.com/zeebo/assert v1.3.0
 )
 
