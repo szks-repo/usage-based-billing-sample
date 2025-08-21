@@ -11,7 +11,7 @@ import (
 	"time"
 
 	"github.com/szks-repo/gopipeline"
-	"github.com/szks-repo/rat-expr-parser"
+	parser "github.com/szks-repo/rat-expr-parser"
 
 	"github.com/szks-repo/usage-based-billing-sample/pkg/db/dto"
 	"github.com/szks-repo/usage-based-billing-sample/pkg/now"
@@ -140,7 +140,7 @@ func (i *InvoiceMaker) createInvoice(
 		uint(invoice.TotalUsage()),
 		uint(invoice.FreeCreditDiscount()),
 		invoice.SubtotalString(),
-		invoice.TaxRate(),
+		invoice.TaxRate().Uint8(),
 		invoice.TaxAmountString(),
 		invoice.TotalPriceString(),
 		uint(invoice.TaxIncludedTotalPrice()),
@@ -227,7 +227,7 @@ type Invoice struct {
 	freeCreditDiscount    uint64
 	totalPrice            *big.Rat
 	taxIncludedTotalPrice uint64
-	taxRate               uint8
+	taxRate               tax.TaxRate
 	taxAmount             *big.Rat
 }
 
@@ -249,7 +249,7 @@ func NewInvoice(
 	subscriptionId uint64,
 	freeCreditBalance uint64,
 	dailyUsages []*DailyApiUsage,
-	taxRate uint8,
+	taxRate tax.TaxRate,
 	priceTable PriceTable,
 ) *Invoice {
 
@@ -269,7 +269,7 @@ func NewInvoice(
 	totalPrice := subtotal
 
 	taxIncludedPriceRat := parser.NewFromString(fmt.Sprintf(
-		"(%s) * ((%d+100)/100)",
+		"(%s) * ((%s+100)/100)",
 		totalPrice.RatString(),
 		taxRate,
 	))
@@ -299,7 +299,7 @@ func (i *Invoice) TaxIncludedTotalPrice() uint64 {
 	return i.taxIncludedTotalPrice
 }
 
-func (i *Invoice) TaxRate() uint8 {
+func (i *Invoice) TaxRate() tax.TaxRate {
 	return i.taxRate
 }
 
