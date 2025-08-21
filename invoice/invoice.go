@@ -47,7 +47,7 @@ func (i *InvoiceMaker) CreateInvoiceDaily(ctx context.Context) {
 		return
 	}
 
-	var priceTable PriceTable
+	var priceTable PriceTable // TODO
 
 	gopipeline.New3(
 		ctx,
