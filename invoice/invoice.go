@@ -8,15 +8,14 @@ import (
 	"log/slog"
 	"math"
 	"math/big"
-	"strconv"
-	"strings"
 	"time"
 
 	"github.com/szks-repo/gopipeline"
-	parser "github.com/szks-repo/rat-expr-parser"
+	"github.com/szks-repo/rat-expr-parser"
 
 	"github.com/szks-repo/usage-based-billing-sample/pkg/db/dto"
 	"github.com/szks-repo/usage-based-billing-sample/pkg/now"
+	"github.com/szks-repo/usage-based-billing-sample/pkg/take"
 	"github.com/szks-repo/usage-based-billing-sample/pkg/tax"
 )
 
@@ -210,11 +209,11 @@ func (pt PriceTable) GetIsShouldApplyDate(date time.Time) *PriceTableItem {
 }
 
 func (pi *PriceTableItem) MustCalculate(dailyUsage uint64) *big.Rat {
-	result, err := parser.NewFromString(strings.Join([]string{
-		strconv.FormatUint(dailyUsage, 64),
-		"*",
-		"(" + pi.basePricePerUsage.RatString() + ")",
-	}, ""))
+	result, err := parser.NewFromString(fmt.Sprintf(
+		"%d + (%s)",
+		dailyUsage,
+		pi.basePricePerUsage.RatString(),
+	))
 	if err != nil {
 		panic(err)
 	}
@@ -269,13 +268,13 @@ func NewInvoice(
 
 	totalPrice := subtotal
 
-	taxIncludedPriceRat := parser.NewFromString(strings.Join([]string{
+	taxIncludedPriceRat := parser.NewFromString(fmt.Sprintf(
+		"(%s) * ((%d+100)/100)",
 		totalPrice.RatString(),
-		"*",
-		fmt.Sprintf("((%d+100)/100)", taxRate),
-	}, ""))
-	f64, _ := taxIncludedPriceRat.Float64()
-	taxIncludedPrice := uint64(math.Floor(f64))
+		taxRate,
+	))
+
+	taxIncludedPrice := uint64(math.Floor(take.Left(taxIncludedPriceRat.Float64())))
 	taxAmount := parser.NewFromString(fmt.Sprintf("%d - (%s)", taxIncludedPrice, subtotal.RatString()))
 
 	return &Invoice{
@@ -293,7 +292,7 @@ func (i *Invoice) TotalUsage() uint64 {
 }
 
 func (i *Invoice) TotalPriceString() string {
-
+	return i.totalPrice.FloatString(5)
 }
 
 func (i *Invoice) TaxIncludedTotalPrice() uint64 {
