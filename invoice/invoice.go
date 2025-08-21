@@ -183,9 +183,9 @@ func (i *InvoiceMaker) listSubscriptions(ctx context.Context, t time.Time) ([]*d
 
 type (
 	PriceTableItem struct {
-		applyStartedAt       time.Time
-		basePricePerVolume   *big.Rat
-		rangePricesPerVolume RangePrices
+		applyStartedAt                time.Time
+		basePricePerUsage             *big.Rat
+		additionalRangePricesPerUsage RangePrices
 	}
 	PriceTable []*PriceTableItem
 
@@ -211,7 +211,7 @@ func (pi *PriceTableItem) MustCalculate(dailyUsage uint64) *big.Rat {
 	result, err := parser.NewFromString(strings.Join([]string{
 		strconv.FormatUint(dailyUsage, 64),
 		"*",
-		"(" + pi.basePricePerVolume.RatString() + ")",
+		"(" + pi.basePricePerUsage.RatString() + ")",
 	}, ""))
 	if err != nil {
 		panic(err)
