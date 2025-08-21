@@ -94,7 +94,7 @@ func (i *InvoiceMaker) listSubscriptionDailyApiUsages(ctx context.Context, subsc
 func (i *InvoiceMaker) getFreeCreditBalanceByAccountId(ctx context.Context, accountId uint64) (uint64, error) {
 	row := i.dbConn.QueryRowContext(
 		ctx,
-		"SELECT balance FROM free_credit_balance_snapshot WHERE account_id = ? ORDER BY created_at DESC LIMIT 1",
+		"SELECT balance FROM account_free_credit_balance_snapshot WHERE account_id = ? ORDER BY created_at DESC LIMIT 1",
 		accountId,
 	)
 	var balance uint64
