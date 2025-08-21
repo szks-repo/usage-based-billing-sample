@@ -13,6 +13,7 @@ require (
 	github.com/samber/lo v1.51.0
 	github.com/spf13/cobra v1.9.1
 	github.com/streadway/amqp v1.1.0
+	github.com/szks-repo/gopipeline v0.0.1
 	github.com/zeebo/assert v1.3.0
 )
 
