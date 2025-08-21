@@ -7,9 +7,11 @@ import (
 	"log/slog"
 	"time"
 
+	"github.com/szks-repo/gopipeline"
+
 	"github.com/szks-repo/usage-based-billing-sample/pkg/db/dto"
 	"github.com/szks-repo/usage-based-billing-sample/pkg/now"
-	"github.com/szks-repo/usage-based-billing-sample/pkg/pipeline"
+	"github.com/szks-repo/usage-based-billing-sample/pkg/tax"
 )
 
 type InvoiceMaker struct {
@@ -40,16 +42,16 @@ func (i *InvoiceMaker) CreateInvoiceDaily(ctx context.Context) {
 		return
 	}
 
-	pipeline.Pipeline3(
+	gopipeline.New3(
 		ctx,
-		pipeline.From(subscriptions),
-		pipeline.ForEach(func(subscription *dto.Subscription) {
+		gopipeline.From(subscriptions),
+		gopipeline.ForEach(func(subscription *dto.Subscription) {
 			i.reconciler.Do(ctx, baseDate, subscription)
 		}),
-		pipeline.Map(func(subscription *dto.Subscription) (*dto.Invoice, error) {
+		gopipeline.Map(func(subscription *dto.Subscription) (*dto.Invoice, error) {
 			return i.createInvoice(ctx, subscription)
 		}),
-		pipeline.ForEach(func(invoice *dto.Invoice) {
+		gopipeline.ForEach(func(invoice *dto.Invoice) {
 			i.publishNotifyQueue(ctx, invoice)
 		}),
 	)
@@ -73,7 +75,7 @@ func (i *InvoiceMaker) createInvoice(ctx context.Context, subscription *dto.Subs
 		TotalUsage:         uint(total),
 		FreeCreditDiscount: 0, //todo
 		Subtotal:           0, //todo
-		TaxRate:            10,
+		TaxRate:            tax.DefaultTaxRate,
 		TotalPrice:         0, //todo
 	}
 	if err := invoiceDto.Insert(ctx, i.dbConn); err != nil {
