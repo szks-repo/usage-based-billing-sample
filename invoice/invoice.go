@@ -48,16 +48,18 @@ func (i *InvoiceMaker) CreateInvoiceDaily(ctx context.Context) {
 		return
 	}
 
+	var priceTable PriceTable
+
 	gopipeline.New3(
 		ctx,
 		gopipeline.From(subscriptions),
 		gopipeline.ForEach(func(subscription *dto.Subscription) {
 			i.reconciler.Do(ctx, baseDate, subscription)
 		}),
-		gopipeline.Map(func(subscription *dto.Subscription) (*dto.Invoice, error) {
-			return i.createInvoice(ctx, subscription)
+		gopipeline.Map(func(subscription *dto.Subscription) (*Invoice, error) {
+			return i.createInvoice(ctx, subscription, priceTable)
 		}),
-		gopipeline.ForEach(func(invoice *dto.Invoice) {
+		gopipeline.ForEach(func(invoice *Invoice) {
 			i.publishNotifyQueue(ctx, invoice)
 		}),
 	)
@@ -106,7 +108,7 @@ func (i *InvoiceMaker) getFreeCreditBalanceByAccountId(ctx context.Context, acco
 func (i *InvoiceMaker) createInvoice(
 	ctx context.Context,
 	subscription *dto.Subscription,
-	priceTable *PriceTable,
+	priceTable PriceTable,
 ) (*Invoice, error) {
 	dailyUsages, err := i.listSubscriptionDailyApiUsages(ctx, subscription)
 	if err != nil {
@@ -150,7 +152,7 @@ func (i *InvoiceMaker) createInvoice(
 	return invoice, nil
 }
 
-func (i *InvoiceMaker) publishNotifyQueue(ctx context.Context, invoice *dto.Invoice) { /* todo */ }
+func (i *InvoiceMaker) publishNotifyQueue(ctx context.Context, invoice *Invoice) { /* todo */ }
 
 func (i *InvoiceMaker) listSubscriptions(ctx context.Context, t time.Time) ([]*dto.Subscription, error) {
 	cutoff := time.Date(t.Year(), t.Month(), t.Day(), 0, 0, 0, 0, time.Local)
@@ -249,7 +251,7 @@ func NewInvoice(
 	freeCreditBalance uint64,
 	dailyUsages []*DailyApiUsage,
 	taxRate uint8,
-	priceTable *PriceTable,
+	priceTable PriceTable,
 ) *Invoice {
 
 	subtotal := new(big.Rat)
