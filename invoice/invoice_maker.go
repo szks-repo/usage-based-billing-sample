@@ -4,18 +4,14 @@ import (
 	"context"
 	"database/sql"
 	"errors"
-	"fmt"
 	"log/slog"
-	"math"
-	"math/big"
 	"time"
 
 	"github.com/szks-repo/gopipeline"
-	parser "github.com/szks-repo/rat-expr-parser"
 
+	"github.com/szks-repo/usage-based-billing-sample/invoice/model"
 	"github.com/szks-repo/usage-based-billing-sample/pkg/db/dto"
 	"github.com/szks-repo/usage-based-billing-sample/pkg/now"
-	"github.com/szks-repo/usage-based-billing-sample/pkg/take"
 	"github.com/szks-repo/usage-based-billing-sample/pkg/tax"
 )
 
@@ -47,7 +43,7 @@ func (i *InvoiceMaker) CreateInvoiceDaily(ctx context.Context) {
 		return
 	}
 
-	var priceTable PriceTable // TODO
+	var priceTable model.PriceTable // TODO
 
 	gopipeline.New3(
 		ctx,
@@ -55,16 +51,16 @@ func (i *InvoiceMaker) CreateInvoiceDaily(ctx context.Context) {
 		gopipeline.ForEach(func(subscription *dto.Subscription) {
 			i.reconciler.Do(ctx, baseDate, subscription)
 		}),
-		gopipeline.Map(func(subscription *dto.Subscription) (*Invoice, error) {
+		gopipeline.Map(func(subscription *dto.Subscription) (*model.Invoice, error) {
 			return i.createInvoice(ctx, subscription, priceTable)
 		}),
-		gopipeline.ForEach(func(invoice *Invoice) {
+		gopipeline.ForEach(func(invoice *model.Invoice) {
 			i.publishNotifyQueue(ctx, invoice)
 		}),
 	)
 }
 
-func (i *InvoiceMaker) listSubscriptionDailyApiUsages(ctx context.Context, subscription *dto.Subscription) ([]*DailyApiUsage, error) {
+func (i *InvoiceMaker) listSubscriptionDailyApiUsages(ctx context.Context, subscription *dto.Subscription) ([]*model.DailyApiUsage, error) {
 	rows, err := i.dbConn.QueryContext(ctx, "SELECT `date`, `usage` FROM daily_api_usage WHERE account_id = ? AND date >= ? AND date <= ?",
 		subscription.AccountID,
 		subscription.From.Format("20060102"),
@@ -75,16 +71,17 @@ func (i *InvoiceMaker) listSubscriptionDailyApiUsages(ctx context.Context, subsc
 	}
 	defer rows.Close()
 
-	var result []*DailyApiUsage
+	var result []*model.DailyApiUsage
 	for rows.Next() {
-		var dst DailyApiUsage
+		var date time.Time
+		var usage uint64
 		if err := rows.Scan(
-			&dst.date,
-			&dst.usage,
+			&date,
+			&usage,
 		); err != nil {
 			return nil, err
 		}
-		result = append(result, &dst)
+		result = append(result, model.NewDailyApiUsage(date, usage))
 	}
 
 	return result, nil
@@ -107,8 +104,8 @@ func (i *InvoiceMaker) getFreeCreditBalanceByAccountId(ctx context.Context, acco
 func (i *InvoiceMaker) createInvoice(
 	ctx context.Context,
 	subscription *dto.Subscription,
-	priceTable PriceTable,
-) (*Invoice, error) {
+	priceTable model.PriceTable,
+) (*model.Invoice, error) {
 	dailyUsages, err := i.listSubscriptionDailyApiUsages(ctx, subscription)
 	if err != nil {
 		return nil, err
@@ -119,7 +116,7 @@ func (i *InvoiceMaker) createInvoice(
 		return nil, err
 	}
 
-	invoice := NewInvoice(
+	invoice := model.NewInvoice(
 		subscription.AccountID,
 		subscription.ID,
 		freeCredit,
@@ -151,7 +148,7 @@ func (i *InvoiceMaker) createInvoice(
 	return invoice, nil
 }
 
-func (i *InvoiceMaker) publishNotifyQueue(ctx context.Context, invoice *Invoice) { /* todo */ }
+func (i *InvoiceMaker) publishNotifyQueue(ctx context.Context, invoice *model.Invoice) { /* todo */ }
 
 func (i *InvoiceMaker) listSubscriptions(ctx context.Context, t time.Time) ([]*dto.Subscription, error) {
 	cutoff := time.Date(t.Year(), t.Month(), t.Day(), 0, 0, 0, 0, time.Local)
@@ -180,137 +177,4 @@ func (i *InvoiceMaker) listSubscriptions(ctx context.Context, t time.Time) ([]*d
 	}
 
 	return subscriptions, nil
-}
-
-type (
-	PriceTableItem struct {
-		applyStartedAt                time.Time
-		basePricePerUsage             *big.Rat
-		additionalRangePricesPerUsage RangePrices
-	}
-	PriceTable []*PriceTableItem
-
-	RangePrice struct {
-		minUsage int
-		maxUsage int
-		price    *big.Rat
-	}
-
-	RangePrices []*RangePrice
-)
-
-func (pt PriceTable) GetIsShouldApplyDate(date time.Time) *PriceTableItem {
-	for _, item := range pt {
-		if item.applyStartedAt.Equal(date) || item.applyStartedAt.After(date) {
-			return item
-		}
-	}
-	return pt[len(pt)-1]
-}
-
-func (pi *PriceTableItem) MustCalculate(dailyUsage uint64) *big.Rat {
-	result, err := parser.NewRatFromString(fmt.Sprintf(
-		"%d + (%s)",
-		dailyUsage,
-		pi.basePricePerUsage.RatString(),
-	))
-	if err != nil {
-		panic(err)
-	}
-
-	return result
-}
-
-type Invoice struct {
-	totalUsage            uint64
-	subtotal              *big.Rat
-	freeCreditDiscount    uint64
-	totalPrice            *big.Rat
-	taxIncludedTotalPrice uint64
-	taxRate               tax.TaxRate
-	taxAmount             *big.Rat
-}
-
-type DailyApiUsage struct {
-	date  time.Time
-	usage uint64
-}
-
-func (du *DailyApiUsage) Date() time.Time {
-	return du.date
-}
-
-func (du *DailyApiUsage) Usage() uint64 {
-	return du.usage
-}
-
-func NewInvoice(
-	accountId uint64,
-	subscriptionId uint64,
-	freeCreditBalance uint64,
-	dailyUsages []*DailyApiUsage,
-	taxRate tax.TaxRate,
-	priceTable PriceTable,
-) *Invoice {
-
-	subtotal := new(big.Rat)
-	var totalUsage uint64
-	for _, du := range dailyUsages {
-		totalUsage += du.Usage()
-		item := priceTable.GetIsShouldApplyDate(du.Date())
-		subtotal = subtotal.Add(subtotal, item.MustCalculate(du.Usage()))
-	}
-
-	// if freeCreditBalance > 0 {
-	// 	f64, _ := rat.Float64()
-	// 	freeCreditBalance = min(freeCreditBalance, uint64(math.Floor(f64)))
-	// }
-
-	totalPrice := subtotal
-
-	taxIncludedPriceRat := parser.NewRatFromString(fmt.Sprintf(
-		"(%s) * ((%s+100)/100)",
-		totalPrice.RatString(),
-		taxRate,
-	))
-
-	taxIncludedPrice := uint64(math.Floor(take.Left(taxIncludedPriceRat.Float64())))
-	taxAmount := parser.NewRatFromString(fmt.Sprintf("%d - (%s)", taxIncludedPrice, subtotal.RatString()))
-
-	return &Invoice{
-		totalUsage:            totalUsage,
-		subtotal:              subtotal,
-		totalPrice:            totalPrice,
-		taxRate:               taxRate,
-		taxIncludedTotalPrice: taxIncludedPrice,
-		taxAmount:             taxAmount,
-	}
-}
-
-func (i *Invoice) TotalUsage() uint64 {
-	return i.totalUsage
-}
-
-func (i *Invoice) TotalPriceString() string {
-	return i.totalPrice.FloatString(5)
-}
-
-func (i *Invoice) TaxIncludedTotalPrice() uint64 {
-	return i.taxIncludedTotalPrice
-}
-
-func (i *Invoice) TaxRate() tax.TaxRate {
-	return i.taxRate
-}
-
-func (i *Invoice) TaxAmountString() string {
-	return i.taxAmount.FloatString(5)
-}
-
-func (i *Invoice) SubtotalString() string {
-	return i.subtotal.FloatString(5)
-}
-
-func (i *Invoice) FreeCreditDiscount() uint64 {
-	return i.freeCreditDiscount
 }
