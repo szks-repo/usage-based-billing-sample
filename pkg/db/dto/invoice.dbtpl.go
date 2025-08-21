@@ -9,15 +9,17 @@ import (
 
 // Invoice represents a row from 'usage_based_billing.invoice'.
 type Invoice struct {
-	ID                 uint64    `json:"id"`                   // id
-	AccountID          uint64    `json:"account_id"`           // account_id
-	SubscriptionID     uint64    `json:"subscription_id"`      // subscription_id
-	TotalUsage         uint      `json:"total_usage"`          // total_usage
-	TaxRate            uint8     `json:"tax_rate"`             // tax_rate
-	Subtotal           uint      `json:"subtotal"`             // subtotal
-	FreeCreditDiscount uint      `json:"free_credit_discount"` // free_credit_discount
-	TotalPrice         uint      `json:"total_price"`          // total_price
-	CreatedAt          time.Time `json:"created_at"`           // created_at
+	ID                    uint64    `json:"id"`                       // id
+	AccountID             uint64    `json:"account_id"`               // account_id
+	SubscriptionID        uint64    `json:"subscription_id"`          // subscription_id
+	TotalUsage            uint      `json:"total_usage"`              // total_usage
+	TaxRate               uint8     `json:"tax_rate"`                 // tax_rate
+	TaxAmount             float64   `json:"tax_amount"`               // tax_amount
+	Subtotal              float64   `json:"subtotal"`                 // subtotal
+	FreeCreditDiscount    uint      `json:"free_credit_discount"`     // free_credit_discount
+	TotalPrice            float64   `json:"total_price"`              // total_price
+	TotalPriceTaxIncluded float64   `json:"total_price_tax_included"` // total_price_tax_included
+	CreatedAt             time.Time `json:"created_at"`               // created_at
 	// xo fields
 	_exists, _deleted bool
 }
@@ -43,13 +45,13 @@ func (i *Invoice) Insert(ctx context.Context, db DB) error {
 	}
 	// insert (primary key generated and returned by database)
 	const sqlstr = `INSERT INTO usage_based_billing.invoice (` +
-		`account_id, subscription_id, total_usage, tax_rate, subtotal, free_credit_discount, total_price, created_at` +
+		`account_id, subscription_id, total_usage, tax_rate, tax_amount, subtotal, free_credit_discount, total_price, total_price_tax_included, created_at` +
 		`) VALUES (` +
-		`?, ?, ?, ?, ?, ?, ?, ?` +
+		`?, ?, ?, ?, ?, ?, ?, ?, ?, ?` +
 		`)`
 	// run
-	logf(sqlstr, i.AccountID, i.SubscriptionID, i.TotalUsage, i.TaxRate, i.Subtotal, i.FreeCreditDiscount, i.TotalPrice, i.CreatedAt)
-	res, err := db.ExecContext(ctx, sqlstr, i.AccountID, i.SubscriptionID, i.TotalUsage, i.TaxRate, i.Subtotal, i.FreeCreditDiscount, i.TotalPrice, i.CreatedAt)
+	logf(sqlstr, i.AccountID, i.SubscriptionID, i.TotalUsage, i.TaxRate, i.TaxAmount, i.Subtotal, i.FreeCreditDiscount, i.TotalPrice, i.TotalPriceTaxIncluded, i.CreatedAt)
+	res, err := db.ExecContext(ctx, sqlstr, i.AccountID, i.SubscriptionID, i.TotalUsage, i.TaxRate, i.TaxAmount, i.Subtotal, i.FreeCreditDiscount, i.TotalPrice, i.TotalPriceTaxIncluded, i.CreatedAt)
 	if err != nil {
 		return logerror(err)
 	}
@@ -74,11 +76,11 @@ func (i *Invoice) Update(ctx context.Context, db DB) error {
 	}
 	// update with primary key
 	const sqlstr = `UPDATE usage_based_billing.invoice SET ` +
-		`account_id = ?, subscription_id = ?, total_usage = ?, tax_rate = ?, subtotal = ?, free_credit_discount = ?, total_price = ?, created_at = ? ` +
+		`account_id = ?, subscription_id = ?, total_usage = ?, tax_rate = ?, tax_amount = ?, subtotal = ?, free_credit_discount = ?, total_price = ?, total_price_tax_included = ?, created_at = ? ` +
 		`WHERE id = ?`
 	// run
-	logf(sqlstr, i.AccountID, i.SubscriptionID, i.TotalUsage, i.TaxRate, i.Subtotal, i.FreeCreditDiscount, i.TotalPrice, i.CreatedAt, i.ID)
-	if _, err := db.ExecContext(ctx, sqlstr, i.AccountID, i.SubscriptionID, i.TotalUsage, i.TaxRate, i.Subtotal, i.FreeCreditDiscount, i.TotalPrice, i.CreatedAt, i.ID); err != nil {
+	logf(sqlstr, i.AccountID, i.SubscriptionID, i.TotalUsage, i.TaxRate, i.TaxAmount, i.Subtotal, i.FreeCreditDiscount, i.TotalPrice, i.TotalPriceTaxIncluded, i.CreatedAt, i.ID)
+	if _, err := db.ExecContext(ctx, sqlstr, i.AccountID, i.SubscriptionID, i.TotalUsage, i.TaxRate, i.TaxAmount, i.Subtotal, i.FreeCreditDiscount, i.TotalPrice, i.TotalPriceTaxIncluded, i.CreatedAt, i.ID); err != nil {
 		return logerror(err)
 	}
 	return nil
@@ -100,15 +102,15 @@ func (i *Invoice) Upsert(ctx context.Context, db DB) error {
 	}
 	// upsert
 	const sqlstr = `INSERT INTO usage_based_billing.invoice (` +
-		`id, account_id, subscription_id, total_usage, tax_rate, subtotal, free_credit_discount, total_price, created_at` +
+		`id, account_id, subscription_id, total_usage, tax_rate, tax_amount, subtotal, free_credit_discount, total_price, total_price_tax_included, created_at` +
 		`) VALUES (` +
-		`?, ?, ?, ?, ?, ?, ?, ?, ?` +
+		`?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?` +
 		`)` +
 		` ON DUPLICATE KEY UPDATE ` +
-		`account_id = VALUES(account_id), subscription_id = VALUES(subscription_id), total_usage = VALUES(total_usage), tax_rate = VALUES(tax_rate), subtotal = VALUES(subtotal), free_credit_discount = VALUES(free_credit_discount), total_price = VALUES(total_price), created_at = VALUES(created_at)`
+		`account_id = VALUES(account_id), subscription_id = VALUES(subscription_id), total_usage = VALUES(total_usage), tax_rate = VALUES(tax_rate), tax_amount = VALUES(tax_amount), subtotal = VALUES(subtotal), free_credit_discount = VALUES(free_credit_discount), total_price = VALUES(total_price), total_price_tax_included = VALUES(total_price_tax_included), created_at = VALUES(created_at)`
 	// run
-	logf(sqlstr, i.ID, i.AccountID, i.SubscriptionID, i.TotalUsage, i.TaxRate, i.Subtotal, i.FreeCreditDiscount, i.TotalPrice, i.CreatedAt)
-	if _, err := db.ExecContext(ctx, sqlstr, i.ID, i.AccountID, i.SubscriptionID, i.TotalUsage, i.TaxRate, i.Subtotal, i.FreeCreditDiscount, i.TotalPrice, i.CreatedAt); err != nil {
+	logf(sqlstr, i.ID, i.AccountID, i.SubscriptionID, i.TotalUsage, i.TaxRate, i.TaxAmount, i.Subtotal, i.FreeCreditDiscount, i.TotalPrice, i.TotalPriceTaxIncluded, i.CreatedAt)
+	if _, err := db.ExecContext(ctx, sqlstr, i.ID, i.AccountID, i.SubscriptionID, i.TotalUsage, i.TaxRate, i.TaxAmount, i.Subtotal, i.FreeCreditDiscount, i.TotalPrice, i.TotalPriceTaxIncluded, i.CreatedAt); err != nil {
 		return logerror(err)
 	}
 	// set exists
@@ -143,7 +145,7 @@ func (i *Invoice) Delete(ctx context.Context, db DB) error {
 func InvoiceByAccountID(ctx context.Context, db DB, accountID uint64) ([]*Invoice, error) {
 	// query
 	const sqlstr = `SELECT ` +
-		`id, account_id, subscription_id, total_usage, tax_rate, subtotal, free_credit_discount, total_price, created_at ` +
+		`id, account_id, subscription_id, total_usage, tax_rate, tax_amount, subtotal, free_credit_discount, total_price, total_price_tax_included, created_at ` +
 		`FROM usage_based_billing.invoice ` +
 		`WHERE account_id = ?`
 	// run
@@ -160,7 +162,7 @@ func InvoiceByAccountID(ctx context.Context, db DB, accountID uint64) ([]*Invoic
 			_exists: true,
 		}
 		// scan
-		if err := rows.Scan(&i.ID, &i.AccountID, &i.SubscriptionID, &i.TotalUsage, &i.TaxRate, &i.Subtotal, &i.FreeCreditDiscount, &i.TotalPrice, &i.CreatedAt); err != nil {
+		if err := rows.Scan(&i.ID, &i.AccountID, &i.SubscriptionID, &i.TotalUsage, &i.TaxRate, &i.TaxAmount, &i.Subtotal, &i.FreeCreditDiscount, &i.TotalPrice, &i.TotalPriceTaxIncluded, &i.CreatedAt); err != nil {
 			return nil, logerror(err)
 		}
 		res = append(res, &i)
@@ -177,7 +179,7 @@ func InvoiceByAccountID(ctx context.Context, db DB, accountID uint64) ([]*Invoic
 func InvoiceByCreatedAt(ctx context.Context, db DB, createdAt time.Time) ([]*Invoice, error) {
 	// query
 	const sqlstr = `SELECT ` +
-		`id, account_id, subscription_id, total_usage, tax_rate, subtotal, free_credit_discount, total_price, created_at ` +
+		`id, account_id, subscription_id, total_usage, tax_rate, tax_amount, subtotal, free_credit_discount, total_price, total_price_tax_included, created_at ` +
 		`FROM usage_based_billing.invoice ` +
 		`WHERE created_at = ?`
 	// run
@@ -194,7 +196,7 @@ func InvoiceByCreatedAt(ctx context.Context, db DB, createdAt time.Time) ([]*Inv
 			_exists: true,
 		}
 		// scan
-		if err := rows.Scan(&i.ID, &i.AccountID, &i.SubscriptionID, &i.TotalUsage, &i.TaxRate, &i.Subtotal, &i.FreeCreditDiscount, &i.TotalPrice, &i.CreatedAt); err != nil {
+		if err := rows.Scan(&i.ID, &i.AccountID, &i.SubscriptionID, &i.TotalUsage, &i.TaxRate, &i.TaxAmount, &i.Subtotal, &i.FreeCreditDiscount, &i.TotalPrice, &i.TotalPriceTaxIncluded, &i.CreatedAt); err != nil {
 			return nil, logerror(err)
 		}
 		res = append(res, &i)
@@ -211,7 +213,7 @@ func InvoiceByCreatedAt(ctx context.Context, db DB, createdAt time.Time) ([]*Inv
 func InvoiceByID(ctx context.Context, db DB, id uint64) (*Invoice, error) {
 	// query
 	const sqlstr = `SELECT ` +
-		`id, account_id, subscription_id, total_usage, tax_rate, subtotal, free_credit_discount, total_price, created_at ` +
+		`id, account_id, subscription_id, total_usage, tax_rate, tax_amount, subtotal, free_credit_discount, total_price, total_price_tax_included, created_at ` +
 		`FROM usage_based_billing.invoice ` +
 		`WHERE id = ?`
 	// run
@@ -219,7 +221,7 @@ func InvoiceByID(ctx context.Context, db DB, id uint64) (*Invoice, error) {
 	i := Invoice{
 		_exists: true,
 	}
-	if err := db.QueryRowContext(ctx, sqlstr, id).Scan(&i.ID, &i.AccountID, &i.SubscriptionID, &i.TotalUsage, &i.TaxRate, &i.Subtotal, &i.FreeCreditDiscount, &i.TotalPrice, &i.CreatedAt); err != nil {
+	if err := db.QueryRowContext(ctx, sqlstr, id).Scan(&i.ID, &i.AccountID, &i.SubscriptionID, &i.TotalUsage, &i.TaxRate, &i.TaxAmount, &i.Subtotal, &i.FreeCreditDiscount, &i.TotalPrice, &i.TotalPriceTaxIncluded, &i.CreatedAt); err != nil {
 		return nil, logerror(err)
 	}
 	return &i, nil
@@ -231,7 +233,7 @@ func InvoiceByID(ctx context.Context, db DB, id uint64) (*Invoice, error) {
 func InvoiceBySubscriptionID(ctx context.Context, db DB, subscriptionID uint64) ([]*Invoice, error) {
 	// query
 	const sqlstr = `SELECT ` +
-		`id, account_id, subscription_id, total_usage, tax_rate, subtotal, free_credit_discount, total_price, created_at ` +
+		`id, account_id, subscription_id, total_usage, tax_rate, tax_amount, subtotal, free_credit_discount, total_price, total_price_tax_included, created_at ` +
 		`FROM usage_based_billing.invoice ` +
 		`WHERE subscription_id = ?`
 	// run
@@ -248,7 +250,7 @@ func InvoiceBySubscriptionID(ctx context.Context, db DB, subscriptionID uint64) 
 			_exists: true,
 		}
 		// scan
-		if err := rows.Scan(&i.ID, &i.AccountID, &i.SubscriptionID, &i.TotalUsage, &i.TaxRate, &i.Subtotal, &i.FreeCreditDiscount, &i.TotalPrice, &i.CreatedAt); err != nil {
+		if err := rows.Scan(&i.ID, &i.AccountID, &i.SubscriptionID, &i.TotalUsage, &i.TaxRate, &i.TaxAmount, &i.Subtotal, &i.FreeCreditDiscount, &i.TotalPrice, &i.TotalPriceTaxIncluded, &i.CreatedAt); err != nil {
 			return nil, logerror(err)
 		}
 		res = append(res, &i)
