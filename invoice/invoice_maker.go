@@ -171,7 +171,7 @@ func (i *InvoiceMaker) createInvoice(
 		subscription.AccountID,
 		subscription.ID,
 		uint(invoice.TotalUsage()),
-		uint(invoice.FreeCreditDiscount()),
+		uint(invoice.FreeCreditUsage()),
 		invoice.SubtotalString(),
 		invoice.TaxRate().Uint8(),
 		invoice.TaxAmountString(),

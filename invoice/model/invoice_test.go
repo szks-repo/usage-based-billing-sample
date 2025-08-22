@@ -40,9 +40,9 @@ func TestNewInvoice(t *testing.T) {
 				priceTable:        NewPriceTable(nil),
 			},
 			want: &Invoice{
-				subtotal:              take.Left(new(big.Rat).SetString("20.00000")),
-				freeCreditDiscount:    0,
 				totalUsage:            20000,
+				freeCreditUsage:       0,
+				subtotal:              take.Left(new(big.Rat).SetString("20.00000")),
 				totalPrice:            take.Left(new(big.Rat).SetString("20.00000")),
 				taxIncludedTotalPrice: 22,
 				taxRate:               tax.DefaultTaxRate,
@@ -65,9 +65,38 @@ func TestNewInvoice(t *testing.T) {
 				priceTable:        NewPriceTable(nil),
 			},
 			want: &Invoice{
-				subtotal:              take.Left(new(big.Rat).SetString("200.00000")),
-				freeCreditDiscount:    0,
 				totalUsage:            200000,
+				freeCreditUsage:       0,
+				subtotal:              take.Left(new(big.Rat).SetString("200.00000")),
+				totalPrice:            take.Left(new(big.Rat).SetString("200.00000")),
+				taxIncludedTotalPrice: 220,
+				taxRate:               tax.DefaultTaxRate,
+				taxAmount:             take.Left(new(big.Rat).SetString("20.00000")),
+			},
+		},
+		{
+			args: args{
+				dailyUsages: []*DailyApiUsage{
+					{
+						date:  time.Date(2025, 1, 1, 0, 0, 0, 0, time.UTC),
+						usage: 100000,
+					},
+					{
+						date:  time.Date(2025, 1, 2, 0, 0, 0, 0, time.UTC),
+						usage: 100000,
+					},
+					{
+						date:  time.Date(2025, 1, 2, 0, 0, 0, 0, time.UTC),
+						usage: 100000,
+					},
+				},
+				freeCreditBalance: 100000,
+				priceTable:        NewPriceTable(nil),
+			},
+			want: &Invoice{
+				totalUsage:            300000,
+				freeCreditUsage:       100000,
+				subtotal:              take.Left(new(big.Rat).SetString("200.00000")),
 				totalPrice:            take.Left(new(big.Rat).SetString("200.00000")),
 				taxIncludedTotalPrice: 220,
 				taxRate:               tax.DefaultTaxRate,
@@ -90,9 +119,9 @@ func TestNewInvoice(t *testing.T) {
 				priceTable:        NewPriceTable(nil),
 			},
 			want: &Invoice{
-				subtotal:              take.Left(new(big.Rat).SetString("256.78300")),
-				freeCreditDiscount:    0,
 				totalUsage:            256783,
+				freeCreditUsage:       0,
+				subtotal:              take.Left(new(big.Rat).SetString("256.78300")),
 				totalPrice:            take.Left(new(big.Rat).SetString("256.78300")),
 				taxIncludedTotalPrice: 282,
 				taxRate:               tax.DefaultTaxRate,
