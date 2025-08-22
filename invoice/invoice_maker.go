@@ -43,8 +43,6 @@ func (i *InvoiceMaker) CreateInvoiceDaily(ctx context.Context) {
 		return
 	}
 
-	var priceTable model.PriceTable // TODO
-
 	gopipeline.New3(
 		ctx,
 		gopipeline.From(subscriptions),
@@ -52,12 +50,46 @@ func (i *InvoiceMaker) CreateInvoiceDaily(ctx context.Context) {
 			i.reconciler.Do(ctx, baseDate, subscription)
 		}),
 		gopipeline.Map(func(subscription *dto.Subscription) (*model.Invoice, error) {
-			return i.createInvoice(ctx, subscription, priceTable)
+			return i.createInvoice(ctx, subscription)
 		}),
 		gopipeline.ForEach(func(invoice *model.Invoice) {
 			i.publishNotifyQueue(ctx, invoice)
 		}),
 	)
+}
+
+func (i *InvoiceMaker) getPriceTable(ctx context.Context, accountId uint64) (*model.PriceTable, error) {
+	query := "SELECT `min_usage`, `max_usage`, `price_per_usage` FROM account_price_table " +
+		"WHERE account_id = ? " +
+		"ORDER BY min_usage ASC"
+	rows, err := i.dbConn.QueryContext(ctx, query, accountId)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var builder model.RangePriceBuilder
+	for rows.Next() {
+		var minUsage int
+		var maxUsage int
+		var pricePerUsage string
+		if err := rows.Scan(
+			&minUsage,
+			&maxUsage,
+			&pricePerUsage,
+		); err != nil {
+			return nil, err
+		}
+
+		builder.Set(minUsage, maxUsage, pricePerUsage)
+	}
+
+	rangePrices, err := builder.Build()
+	if err != nil {
+		return nil, err
+	}
+
+	return model.NewPriceTable(rangePrices), nil
 }
 
 func (i *InvoiceMaker) listSubscriptionDailyApiUsages(ctx context.Context, subscription *dto.Subscription) ([]*model.DailyApiUsage, error) {
@@ -104,7 +136,6 @@ func (i *InvoiceMaker) getFreeCreditBalanceByAccountId(ctx context.Context, acco
 func (i *InvoiceMaker) createInvoice(
 	ctx context.Context,
 	subscription *dto.Subscription,
-	priceTable model.PriceTable,
 ) (*model.Invoice, error) {
 	dailyUsages, err := i.listSubscriptionDailyApiUsages(ctx, subscription)
 	if err != nil {
@@ -112,6 +143,11 @@ func (i *InvoiceMaker) createInvoice(
 	}
 
 	freeCredit, err := i.getFreeCreditBalanceByAccountId(ctx, subscription.AccountID)
+	if err != nil {
+		return nil, err
+	}
+
+	priceTable, err := i.getPriceTable(ctx, subscription.AccountID)
 	if err != nil {
 		return nil, err
 	}

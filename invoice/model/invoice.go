@@ -1,6 +1,7 @@
 package model
 
 import (
+	"errors"
 	"fmt"
 	"math"
 	"math/big"
@@ -12,12 +13,15 @@ import (
 )
 
 type (
-	PriceTableItem struct {
-		applyStartedAt                time.Time
-		basePricePerUsage             *big.Rat
+	PriceTable struct {
+		items                         []*PriceTableItem
 		additionalRangePricesPerUsage RangePrices
 	}
-	PriceTable []*PriceTableItem
+
+	PriceTableItem struct {
+		applyStartedAt    time.Time
+		basePricePerUsage *big.Rat
+	}
 
 	RangePrice struct {
 		minUsage int
@@ -28,20 +32,59 @@ type (
 	RangePrices []*RangePrice
 )
 
-func (pt PriceTable) GetIsShouldApplyDate(date time.Time) *PriceTableItem {
-	for _, item := range pt {
+func NewPriceTable(rangePrices RangePrices) *PriceTable {
+	return &PriceTable{
+		items: []*PriceTableItem{
+			{
+				applyStartedAt:    time.Time{},
+				basePricePerUsage: take.Left(new(big.Rat).SetString("0.001")),
+			},
+		},
+		additionalRangePricesPerUsage: rangePrices,
+	}
+}
+
+type RangePriceBuilder struct {
+	items []*RangePrice
+	errs  []error
+}
+
+func (b *RangePriceBuilder) Set(minUsage, maxUsage int, pricePerUsage string) {
+	rat, err := parser.NewRatFromString(pricePerUsage)
+	if err != nil {
+		b.errs = append(b.errs, err)
+		return
+	}
+	b.items = append(b.items, &RangePrice{
+		minUsage: minUsage,
+		maxUsage: maxUsage,
+		price:    rat,
+	})
+}
+
+func (b *RangePriceBuilder) Build() (RangePrices, error) {
+	if len(b.errs) > 0 {
+		return nil, errors.Join(b.errs...)
+	}
+	return b.items, nil
+}
+
+func (pt PriceTable) getShouldApplyDate(date time.Time) *PriceTableItem {
+	for _, item := range pt.items {
 		if item.applyStartedAt.Equal(date) || item.applyStartedAt.After(date) {
 			return item
 		}
 	}
-	return pt[len(pt)-1]
+	return pt.items[len(pt.items)-1]
 }
 
-func (pi *PriceTableItem) MustCalculate(dailyUsage uint64) *big.Rat {
+func (pt *PriceTable) MustCalculate(date time.Time, dailyUsage uint64) *big.Rat {
+	item := pt.getShouldApplyDate(date)
+
 	result, err := parser.NewRatFromString(fmt.Sprintf(
 		"%d + (%s)",
 		dailyUsage,
-		pi.basePricePerUsage.RatString(),
+		item.basePricePerUsage.RatString(),
 	))
 	if err != nil {
 		panic(err)
@@ -86,15 +129,14 @@ func NewInvoice(
 	freeCreditBalance uint64,
 	dailyUsages []*DailyApiUsage,
 	taxRate tax.TaxRate,
-	priceTable PriceTable,
+	priceTable *PriceTable,
 ) *Invoice {
 
 	subtotal := new(big.Rat)
 	var totalUsage uint64
 	for _, du := range dailyUsages {
 		totalUsage += du.Usage()
-		item := priceTable.GetIsShouldApplyDate(du.Date())
-		subtotal = subtotal.Add(subtotal, item.MustCalculate(du.Usage()))
+		subtotal = subtotal.Add(subtotal, priceTable.MustCalculate(du.Date(), du.Usage()))
 	}
 
 	// if freeCreditBalance > 0 {
