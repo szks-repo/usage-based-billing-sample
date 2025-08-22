@@ -88,17 +88,21 @@ func (pt *PriceTable) MustCalculate(dailyUsages []*DailyApiUsage, freeCredit uin
 		freeCreditUsage += totalUsageAfterCerditApplied
 	}
 
-	subtotal, err := parser.NewRatFromString(fmt.Sprintf(
-		"%d * (%s)",
-		totalUsageAfterCerditApplied,
-		pt.item.basePricePerUsage.RatString(),
-	))
-	if err != nil {
-		panic(err)
-	}
+	subtotal := new(big.Rat).SetInt64(0)
+	if totalUsageAfterCerditApplied > 0 {
+		var err error
+		subtotal, err = parser.NewRatFromString(fmt.Sprintf(
+			"%d * (%s)",
+			totalUsageAfterCerditApplied,
+			pt.item.basePricePerUsage.RatString(),
+		))
+		if err != nil {
+			panic(err)
+		}
 
-	// for _, additional := range pt.additionalRangePricesPerUsage {
-	// }
+		// for _, additional := range pt.additionalRangePricesPerUsage {
+		// }
+	}
 
 	return &CalculateResult{
 		Subtotal:        subtotal,
