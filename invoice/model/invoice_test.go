@@ -49,6 +49,31 @@ func TestNewInvoice(t *testing.T) {
 				taxAmount:             take.Left(new(big.Rat).SetString("2.00000")),
 			},
 		},
+		{
+			args: args{
+				dailyUsages: []*DailyApiUsage{
+					{
+						date:  time.Date(2025, 1, 1, 0, 0, 0, 0, time.UTC),
+						usage: 100000,
+					},
+					{
+						date:  time.Date(2025, 1, 2, 0, 0, 0, 0, time.UTC),
+						usage: 100000,
+					},
+				},
+				freeCreditBalance: 0,
+				priceTable:        NewPriceTable(nil),
+			},
+			want: &Invoice{
+				subtotal:              take.Left(new(big.Rat).SetString("200.000")),
+				freeCreditDiscount:    0,
+				totalUsage:            200000,
+				totalPrice:            take.Left(new(big.Rat).SetString("200.000")),
+				taxIncludedTotalPrice: 220,
+				taxRate:               tax.DefaultTaxRate,
+				taxAmount:             take.Left(new(big.Rat).SetString("20.0000")),
+			},
+		},
 	}
 
 	for _, tt := range tests {
@@ -62,6 +87,7 @@ func TestNewInvoice(t *testing.T) {
 				tt.args.priceTable,
 			)
 			if !assert.Equal(t, tt.want, got) {
+				t.Log(got.TotalUsage())
 				t.Log(got.SubtotalString())
 				t.Log(got.TotalPriceString())
 				t.Log(got.TaxAmountString())
