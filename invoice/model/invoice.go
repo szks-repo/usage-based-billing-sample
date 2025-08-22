@@ -7,14 +7,16 @@ import (
 	"math/big"
 	"time"
 
+	"github.com/samber/lo"
 	parser "github.com/szks-repo/rat-expr-parser"
+
 	"github.com/szks-repo/usage-based-billing-sample/pkg/take"
 	"github.com/szks-repo/usage-based-billing-sample/pkg/tax"
 )
 
 type (
 	PriceTable struct {
-		items                         []*PriceTableItem
+		item                          *PriceTableItem
 		additionalRangePricesPerUsage RangePrices
 	}
 
@@ -34,11 +36,9 @@ type (
 
 func NewPriceTable(rangePrices RangePrices) *PriceTable {
 	return &PriceTable{
-		items: []*PriceTableItem{
-			{
-				applyStartedAt:    time.Time{},
-				basePricePerUsage: take.Left(new(big.Rat).SetString("0.001")),
-			},
+		item: &PriceTableItem{
+			applyStartedAt:    time.Time{},
+			basePricePerUsage: take.Left(new(big.Rat).SetString("0.001")),
 		},
 		additionalRangePricesPerUsage: rangePrices,
 	}
@@ -69,38 +69,43 @@ func (b *RangePriceBuilder) Build() (RangePrices, error) {
 	return b.items, nil
 }
 
-func (pt PriceTable) getShouldApplyDate(date time.Time) *PriceTableItem {
-	for _, item := range pt.items {
-		if item.applyStartedAt.Equal(date) || item.applyStartedAt.After(date) {
-			return item
-		}
-	}
-	return pt.items[len(pt.items)-1]
+type CalculateResult struct {
+	Subtotal        *big.Rat
+	TotalPrice      *big.Rat
+	TotalUsage      uint64
+	FreeCreditUsage uint64
 }
 
-func (pt *PriceTable) MustCalculate(date time.Time, dailyUsage uint64) *big.Rat {
-	item := pt.getShouldApplyDate(date)
+func (pt *PriceTable) MustCalculate(dailyUsages []*DailyApiUsage, freeCredit uint64) *CalculateResult {
+	totalUsage := lo.SumBy(dailyUsages, func(du *DailyApiUsage) uint64 {
+		return du.Usage()
+	})
 
-	result, err := parser.NewRatFromString(fmt.Sprintf(
+	freeCreditUsage := int64(freeCredit)
+	totalUsageAfterCerditApplied := int64(totalUsage) - int64(freeCredit)
+	if totalUsageAfterCerditApplied < 0 {
+		totalUsageAfterCerditApplied = 0
+		freeCreditUsage += totalUsageAfterCerditApplied
+	}
+
+	subtotal, err := parser.NewRatFromString(fmt.Sprintf(
 		"%d * (%s)",
-		dailyUsage,
-		item.basePricePerUsage.RatString(),
+		totalUsageAfterCerditApplied,
+		pt.item.basePricePerUsage.RatString(),
 	))
 	if err != nil {
 		panic(err)
 	}
 
-	return result
-}
+	// for _, additional := range pt.additionalRangePricesPerUsage {
+	// }
 
-type Invoice struct {
-	totalUsage            uint64
-	subtotal              *big.Rat
-	freeCreditDiscount    uint64
-	totalPrice            *big.Rat
-	taxIncludedTotalPrice uint64
-	taxRate               tax.TaxRate
-	taxAmount             *big.Rat
+	return &CalculateResult{
+		Subtotal:        subtotal,
+		TotalPrice:      subtotal,
+		TotalUsage:      totalUsage,
+		FreeCreditUsage: uint64(freeCreditUsage),
+	}
 }
 
 type DailyApiUsage struct {
@@ -123,6 +128,16 @@ func (du *DailyApiUsage) Usage() uint64 {
 	return du.usage
 }
 
+type Invoice struct {
+	totalUsage            uint64
+	freeCreditUsage       uint64
+	subtotal              *big.Rat
+	totalPrice            *big.Rat
+	taxIncludedTotalPrice uint64
+	taxRate               tax.TaxRate
+	taxAmount             *big.Rat
+}
+
 func NewInvoice(
 	accountId uint64,
 	subscriptionId uint64,
@@ -131,34 +146,26 @@ func NewInvoice(
 	taxRate tax.TaxRate,
 	priceTable *PriceTable,
 ) *Invoice {
-
-	subtotal := new(big.Rat)
-	var totalUsage uint64
-	for _, du := range dailyUsages {
-		totalUsage += du.Usage()
-		subtotal = subtotal.Add(subtotal, priceTable.MustCalculate(du.Date(), du.Usage()))
-	}
-
-	// if freeCreditBalance > 0 {
-	// 	f64, _ := rat.Float64()
-	// 	freeCreditBalance = min(freeCreditBalance, uint64(math.Floor(f64)))
-	// }
-
-	totalPrice := subtotal
+	result := priceTable.MustCalculate(dailyUsages, freeCreditBalance)
 
 	taxIncludedPriceRat := take.Left(parser.NewRatFromString(fmt.Sprintf(
 		"(%s) * ((%s+100)/100)",
-		totalPrice.RatString(),
+		result.TotalPrice.RatString(),
 		taxRate,
 	)))
 
 	taxIncludedPrice := uint64(math.Floor(take.Left(taxIncludedPriceRat.Float64())))
-	taxAmount := take.Left(parser.NewRatFromString(fmt.Sprintf("%d - (%s)", taxIncludedPrice, subtotal.RatString())))
+	taxAmount := take.Left(parser.NewRatFromString(fmt.Sprintf(
+		"%d - (%s)",
+		taxIncludedPrice,
+		result.TotalPrice.RatString(),
+	)))
 
 	return &Invoice{
-		totalUsage:            totalUsage,
-		subtotal:              subtotal,
-		totalPrice:            totalPrice,
+		totalUsage:            result.TotalUsage,
+		freeCreditUsage:       result.FreeCreditUsage,
+		subtotal:              result.Subtotal,
+		totalPrice:            result.TotalPrice,
 		taxRate:               taxRate,
 		taxIncludedTotalPrice: taxIncludedPrice,
 		taxAmount:             taxAmount,
@@ -167,6 +174,10 @@ func NewInvoice(
 
 func (i *Invoice) TotalUsage() uint64 {
 	return i.totalUsage
+}
+
+func (i *Invoice) FreeCreditUsage() uint64 {
+	return i.freeCreditUsage
 }
 
 func (i *Invoice) TotalPriceString() string {
@@ -187,8 +198,4 @@ func (i *Invoice) TaxAmountString() string {
 
 func (i *Invoice) SubtotalString() string {
 	return i.subtotal.FloatString(5)
-}
-
-func (i *Invoice) FreeCreditDiscount() uint64 {
-	return i.freeCreditDiscount
 }
