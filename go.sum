@@ -94,8 +94,6 @@ github.com/stretchr/testify v1.9.0 h1:HtqpIVDClZ4nwg75+f6Lvsy/wHu+3BoSGCbBAcpTsT
 github.com/stretchr/testify v1.9.0/go.mod h1:r2ic/lqez/lEtzL7wO/rwa5dbSLXVDPFyf8C91i36aY=
 github.com/szks-repo/gopipeline v0.0.1 h1:fST0kveZ+x3FANMXg9/vOiNSxMK3JWg0VZq9IONXuU0=
 github.com/szks-repo/gopipeline v0.0.1/go.mod h1:nTlAmikmXQwZmR5OgfilR5VMBfzMsmjMKD85DQ3lc/8=
-github.com/szks-repo/rat-expr-parser v0.2.0 h1:j92S+ciA+CcWYkRL9naGurDPCwbVP2y3mEmfAMH+OKI=
-github.com/szks-repo/rat-expr-parser v0.2.0/go.mod h1:2mpescf83x2th3j1ZPld4eAFUZBuFMGKtlK9H2G5p/Y=
 github.com/szks-repo/rat-expr-parser v0.2.1 h1:IQ4pHuPmr1yaI6QYDXxQ7MdqjI8f3GmySA2fVryqUJ4=
 github.com/szks-repo/rat-expr-parser v0.2.1/go.mod h1:2mpescf83x2th3j1ZPld4eAFUZBuFMGKtlK9H2G5p/Y=
 github.com/zeebo/assert v1.3.0 h1:g7C04CbJuIDKNPFHmsk4hwZDO5O+kntRxzaUoNXj+IQ=
@@ -127,6 +125,7 @@ google.golang.org/grpc v1.63.2 h1:MUeiw1B2maTVZthpU5xvASfTh3LDbxHd6IJ6QQVU+xM=
 google.golang.org/grpc v1.63.2/go.mod h1:WAX/8DgncnokcFUldAxq7GeB5DXHDbMF+lLvDomNkRA=
 google.golang.org/protobuf v1.34.2 h1:6xV6lTsCfpGD21XK49h7MhtcApnLqkfYgPcdHftf6hg=
 google.golang.org/protobuf v1.34.2/go.mod h1:qYOHts0dSfpeUzUFpOMr/WGzszTmLH+DiWniOlNbLDw=
+gopkg.in/check.v1 v0.0.0-20161208181325-20d25e280405 h1:yhCVgyC4o1eVCa2tZl7eS0r+SDo693bJlVdllGtEeKM=
 gopkg.in/check.v1 v0.0.0-20161208181325-20d25e280405/go.mod h1:Co6ibVJAznAaIkqp8huTwlJQCZ016jof/cbN4VW5Yz0=
 gopkg.in/yaml.v3 v3.0.1 h1:fxVm/GzAzEWqLHuvctI91KS9hhNmmWOoWu0XTYJS7CA=
 gopkg.in/yaml.v3 v3.0.1/go.mod h1:K4uyk7z7BCEPqu6E+C64Yfv1cQ7kz7rIZviUmN+EgEM=

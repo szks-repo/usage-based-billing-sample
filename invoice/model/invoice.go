@@ -82,7 +82,7 @@ func (pt *PriceTable) MustCalculate(date time.Time, dailyUsage uint64) *big.Rat 
 	item := pt.getShouldApplyDate(date)
 
 	result, err := parser.NewRatFromString(fmt.Sprintf(
-		"%d + (%s)",
+		"%d * (%s)",
 		dailyUsage,
 		item.basePricePerUsage.RatString(),
 	))
@@ -146,14 +146,14 @@ func NewInvoice(
 
 	totalPrice := subtotal
 
-	taxIncludedPriceRat := parser.NewRatFromString(fmt.Sprintf(
+	taxIncludedPriceRat := take.Left(parser.NewRatFromString(fmt.Sprintf(
 		"(%s) * ((%s+100)/100)",
 		totalPrice.RatString(),
 		taxRate,
-	))
+	)))
 
 	taxIncludedPrice := uint64(math.Floor(take.Left(taxIncludedPriceRat.Float64())))
-	taxAmount := parser.NewRatFromString(fmt.Sprintf("%d - (%s)", taxIncludedPrice, subtotal.RatString()))
+	taxAmount := take.Left(parser.NewRatFromString(fmt.Sprintf("%d - (%s)", taxIncludedPrice, subtotal.RatString())))
 
 	return &Invoice{
 		totalUsage:            totalUsage,
