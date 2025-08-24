@@ -10,6 +10,7 @@ import (
 	"github.com/szks-repo/gopipeline"
 
 	"github.com/szks-repo/usage-based-billing-sample/invoice/model"
+	"github.com/szks-repo/usage-based-billing-sample/pkg/db"
 	"github.com/szks-repo/usage-based-billing-sample/pkg/db/dto"
 	"github.com/szks-repo/usage-based-billing-sample/pkg/now"
 	"github.com/szks-repo/usage-based-billing-sample/pkg/tax"
@@ -152,6 +153,11 @@ func (i *InvoiceMaker) createInvoice(
 		return nil, err
 	}
 
+	txn, err := db.GetTxn(ctx)
+	if err != nil {
+		return nil, err
+	}
+
 	invoice := model.NewInvoice(
 		subscription.AccountID,
 		subscription.ID,
@@ -165,7 +171,7 @@ func (i *InvoiceMaker) createInvoice(
 		"(account_id, subscription_id, total_usage, free_credit_discount, subtotal, tax_rate, tax_amount, total_price, tax_included_total_price) " +
 		"VALUES (?,?,?,?,?,?,?,?,?)"
 
-	if _, err := i.dbConn.ExecContext(
+	if _, err := txn.ExecContext(
 		ctx,
 		query,
 		subscription.AccountID,
@@ -179,6 +185,26 @@ func (i *InvoiceMaker) createInvoice(
 		uint(invoice.TaxIncludedTotalPrice()),
 	); err != nil {
 		return nil, err
+	}
+
+	if invoice.FreeCreditUsage() > 0 {
+		reduceBalance := &dto.AccountFreeCreditBalance{
+			AccountID: subscription.AccountID,
+			Credit:    int(invoice.FreeCreditUsage()) * -1,
+		}
+		if err := reduceBalance.Insert(ctx, txn); err != nil {
+			return nil, err
+		}
+
+		if _, err := txn.ExecContext(
+			ctx,
+			"INSERT INTO account_free_credit_balance_snapshot "+
+				"(`account_id`, `credit`) VALUES (?, (SELECT SUM(credit) FROM `account_free_credit_balance` WHERE account_id = ?))",
+			subscription.AccountID,
+			subscription.AccountID,
+		); err != nil {
+			return nil, err
+		}
 	}
 
 	return invoice, nil
