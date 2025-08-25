@@ -87,7 +87,7 @@ func (pt *PriceTable) MustCalculate(dailyUsages []*DailyApiUsage, freeCredit uin
 		totalUsageAfterCerditApplied = 0
 		freeCreditUsage += totalUsageAfterCerditApplied
 	}
-Z
+
 	subtotal := new(big.Rat).SetInt64(0)
 	if totalUsageAfterCerditApplied > 0 {
 		var err error
