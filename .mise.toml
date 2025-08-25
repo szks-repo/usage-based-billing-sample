@@ -31,3 +31,8 @@ description = 'run cmd/receiverWorker'
 [tasks.run-provider]
 run = 'go run main.go providerApi'
 description = 'run cmd/providerApi'
+
+[tasks.'exec:create-daily-invoice']
+run = 'go run main.go createDailyInvoice'
+description = 'run cmd/createDailyInvoice'
+
